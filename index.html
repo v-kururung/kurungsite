@@ -39,7 +39,7 @@ a{color:inherit;text-decoration:none}
 .menu a:hover{color:var(--pink-deep)}
 .menu a.on{color:var(--ink)}
 .menu a.on::after{content:"";position:absolute;left:50%;transform:translateX(-50%);
-  bottom:-4px;width:6px;height:6px;border-radius:50%;background:var(--yellow)}
+  bottom:-4px;width:6px;height:6px;border-radius:50%;background:var(--pink)}
 .ask{font-family:var(--body);font-size:14px;padding:9px 20px;border:none;cursor:pointer;
   background:var(--pink);color:#fff;border-radius:22px;transition:.2s;box-shadow:0 6px 14px rgba(246,183,216,.5)}
 .ask:hover{background:var(--pink-deep);transform:translateY(-1px)}
@@ -67,7 +67,7 @@ a{color:inherit;text-decoration:none}
 .day .date{font-family:var(--disp);font-size:25px;margin-top:2px;color:var(--ink)}
 .day .evt{margin-top:auto;width:100%;height:64px;padding:6px 8px;border-radius:12px;
   background:var(--page);display:flex;align-items:center;justify-content:center;overflow:hidden}
-.day .evt-in{display:flex;flex-direction:column;align-items:center;gap:2px;width:100%}
+.day .evt-in{display:flex;flex-direction:column;align-items:center;gap:5px;width:100%}
 .day .etime{color:var(--pink-deep);font-family:var(--latin);font-weight:600;font-size:12px;line-height:1.1}
 .day .etitle{font-size:13.5px;line-height:1.3;color:var(--ink);text-align:center;word-break:break-word;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -222,7 +222,7 @@ a{color:inherit;text-decoration:none}
     <h3>✉️ 문의하기</h3>
     <div class="d">쿠룽v에게 하고 싶은 말을 남겨주세요 🌿</div>
     <input id="nick" placeholder="닉네임 (필수)">
-    <input id="contact" placeholder="답장받을 곳 — SOOP닉 / 디스코드 / 이메일 (선택)">
+    <input id="contact" placeholder="답장받을 이메일">
     <textarea id="msg" rows="4" placeholder="문의 내용을 적어주세요"></textarea>
     <div id="askStatus" class="astat"></div>
     <div class="mbtns">
@@ -341,7 +341,7 @@ function closeAsk(){document.getElementById('ov').classList.remove('on');var s=d
    2) Table Editor → inquiries 테이블 만들기 (컬럼: nickname, contact, message = text)
    3) RLS 정책: anon 역할에 INSERT 허용 (SELECT는 막아서 남이 못 읽게)
    4) Project Settings → API 에서 URL과 anon key를 아래에 붙여넣기 (anon key는 공개돼도 안전) */
-var SUPA={ url:'', anonKey:'' };
+var SUPA={ url:'https://vamcglwzfydknvgivaho.supabase.co', anonKey:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZhbWNnbHd6Znlka252Z2l2YWhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NTE5MTksImV4cCI6MjEwMDEyNzkxOX0.3C7MXa4RL-iJaVZ7ueAGxYSY2CeOqAdAGt4FEQKrrk0' };
 var sb=(SUPA.url && window.supabase) ? window.supabase.createClient(SUPA.url, SUPA.anonKey) : null;
 
 async function sendAsk(){
