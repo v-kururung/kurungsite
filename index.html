@@ -73,7 +73,8 @@ a{color:inherit;text-decoration:none}
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .day .evt.empty{background:transparent}
 .day .evt.empty .etitle{color:var(--sub)}
-.day.today{background:linear-gradient(160deg,var(--pink),var(--pink-deep))}
+.day.today{background:linear-gradient(155deg,#ff9dcb,#e778ae);
+  box-shadow:0 14px 28px rgba(231,120,174,.45);transform:translateY(-3px)}
 .day.today .dow,.day.today .date{color:#fff}
 .day.today .evt{background:rgba(255,255,255,.22)}
 .day.today .etitle,.day.today .etime{color:#fff}
@@ -115,6 +116,7 @@ a{color:inherit;text-decoration:none}
   background:var(--card);box-shadow:var(--shadow);color:var(--sub);transition:.2s}
 .links a:hover{color:#fff;background:var(--pink);transform:translateY(-2px)}
 .links a .ic{font-size:16px}
+.links a img.ic{width:18px;height:18px;object-fit:contain;display:block}
 
 /* ══ 바텀 ══ */
 .bottom{position:relative;z-index:1;margin-top:56px;padding:34px 0 44px;text-align:center;border-top:1px solid var(--line)}
@@ -204,8 +206,8 @@ a{color:inherit;text-decoration:none}
   </section>
 
   <nav class="links">
-    <a href="https://www.sooplive.com/station/kururung" target="_blank" rel="noopener"><span class="ic">🌳</span>숲</a>
-    <a href="https://www.youtube.com/@%EC%BF%A0%EB%A3%BDv" target="_blank" rel="noopener"><span class="ic">▶</span>유튜브</a>
+    <a href="https://www.sooplive.com/station/kururung" target="_blank" rel="noopener"><img class="ic" src="soop.png" alt="">숲</a>
+    <a href="https://www.youtube.com/@%EC%BF%A0%EB%A3%BDv" target="_blank" rel="noopener"><img class="ic" src="youtube.png" alt="">유튜브</a>
     <a href="#" onclick="openAsk();return false;"><span class="ic">✉️</span>문의</a>
   </nav>
 
