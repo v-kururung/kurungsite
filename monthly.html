@@ -51,9 +51,11 @@ a{color:inherit;text-decoration:none}
 .viewer{background:var(--card);border:1px solid var(--line);border-radius:24px;
   box-shadow:var(--shadow);padding:26px;max-width:720px;margin:0 auto}
 .vmain{display:flex;align-items:center;gap:14px}
-.arw{width:38px;height:38px;flex-shrink:0;border:none;cursor:pointer;border-radius:50%;
-  background:var(--pink-soft);color:var(--pink-deep);font-size:16px;display:grid;place-items:center;transition:.2s}
-.arw:hover{background:var(--pink);color:#fff}
+.arw{width:44px;height:44px;flex-shrink:0;border:none;cursor:pointer;border-radius:50%;
+  background:var(--card);color:var(--pink-deep);font-family:var(--body);font-size:22px;line-height:1;
+  display:grid;place-items:center;box-shadow:0 6px 16px rgba(238,155,198,.35);transition:.18s}
+.arw:hover{background:var(--pink);color:#fff;transform:scale(1.12)}
+.arw:active{transform:scale(.96)}
 .stage{flex:1;min-width:0;max-height:640px;background:transparent;border-radius:16px;
   display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:zoom-in}
 .stage img{max-width:100%;max-height:640px;width:auto;height:auto;object-fit:contain;display:block;border-radius:12px}
@@ -109,7 +111,7 @@ footer p{margin-top:10px;font-size:13px;color:var(--sub)}
 <main class="content"><div class="wrap">
   <div class="mhead">
     <div class="en">Monthly Kurung</div>
-    <h2>월간 쿠룽 · 화보집</h2>
+    <h2>월간쿠룽</h2>
   </div>
 
   <div class="viewer" id="viewer">
@@ -117,9 +119,9 @@ footer p{margin-top:10px;font-size:13px;color:var(--sub)}
 
     <div id="body" style="display:none">
       <div class="vmain">
-        <button class="arw" id="prev" aria-label="이전">‹</button>
+        <button class="arw" id="prev" aria-label="이전">❮</button>
         <div class="stage" id="stage" onclick="openLb()"><span class="ph">🖼️</span></div>
-        <button class="arw" id="next" aria-label="다음">›</button>
+        <button class="arw" id="next" aria-label="다음">❯</button>
       </div>
       <div class="cap">
         <div class="t" id="cap-t"></div>
