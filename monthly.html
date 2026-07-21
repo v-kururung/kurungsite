@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>쿠룽v</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&family=Gamja+Flower&family=Poppins:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --pink:#f6b7d8; --pink-deep:#ee9bc6; --pink-soft:#ffe3f1;
+  --yellow:#ffd86b; --yellow-soft:#fff0c6; --lav-soft:#ebd8ff;
+  --page:#fff9fc; --card:#ffffff; --ink:#413a48; --sub:#867a83;
+  --line:#fbe9f2; --shadow:0 18px 44px rgba(238,155,198,.18);
+  --disp:"Jua",sans-serif; --body:"Gowun Dodum",sans-serif;
+  --hand:"Gamja Flower",cursive; --latin:"Poppins",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);color:var(--ink);background:var(--page);
+  font-size:17px;line-height:1.75;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1000px;margin:0 auto;padding:0 24px}
+
+#sky{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.spark{position:absolute;top:-24px;color:var(--pink);opacity:.6;animation:drift linear infinite}
+@keyframes drift{to{transform:translateY(106vh) rotate(160deg);opacity:0}}
+@media(prefers-reduced-motion:reduce){.spark{display:none}}
+
+/* 탑 */
+.top{position:sticky;top:0;z-index:20;background:rgba(255,249,252,.82);
+  backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;height:70px}
+.logo{font-family:var(--disp);font-size:28px;color:var(--ink);display:flex;align-items:center;gap:2px}
+.logo b{color:var(--ink);font-weight:400}
+.logo .v{color:var(--ink);font-size:30px}
+.menu{display:flex;gap:34px}
+.menu a{font-size:15px;color:var(--sub);position:relative;padding:4px 0;transition:color .2s}
+.menu a:hover{color:var(--pink-deep)}
+.menu a.on{color:var(--ink)}
+.menu a.on::after{content:"";position:absolute;left:50%;transform:translateX(-50%);
+  bottom:-4px;width:6px;height:6px;border-radius:50%;background:var(--pink)}
+
+/* 컨텐츠 */
+.content{position:relative;z-index:1;padding:44px 0 20px}
+.mhead{text-align:center;margin-bottom:26px}
+.mhead .en{font-family:var(--latin);font-weight:600;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--pink-deep)}
+.mhead h2{font-family:var(--disp);font-weight:400;font-size:28px;color:var(--ink);margin-top:2px}
+
+/* 뷰어 */
+.viewer{background:var(--card);border:1px solid var(--line);border-radius:24px;
+  box-shadow:var(--shadow);padding:26px;max-width:720px;margin:0 auto}
+.vmain{display:flex;align-items:center;gap:14px}
+.arw{width:38px;height:38px;flex-shrink:0;border:none;cursor:pointer;border-radius:50%;
+  background:var(--pink-soft);color:var(--pink-deep);font-size:16px;display:grid;place-items:center;transition:.2s}
+.arw:hover{background:var(--pink);color:#fff}
+.stage{flex:1;min-width:0;height:360px;background:var(--pink-soft);border-radius:16px;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:zoom-in}
+.stage img{max-width:100%;max-height:100%;object-fit:contain;display:block;border-radius:8px}
+.stage .ph{font-size:40px;color:var(--pink-deep)}
+.cap{text-align:center;margin-top:16px}
+.cap .t{font-family:var(--disp);font-weight:400;font-size:20px;color:var(--ink)}
+.cap .d{font-size:14px;color:var(--sub);margin-top:5px;line-height:1.6}
+
+/* 썸네일 */
+.thumbs-row{display:flex;align-items:center;gap:8px;justify-content:center;margin-top:20px}
+.tarw{width:26px;height:56px;flex-shrink:0;border:none;cursor:pointer;border-radius:10px;
+  background:transparent;color:var(--sub);font-size:15px;transition:.2s}
+.tarw:hover:not(:disabled){color:var(--pink-deep)}
+.tarw:disabled{opacity:.25;cursor:default}
+.thumbs{display:flex;gap:8px}
+.thumb{width:56px;height:70px;flex-shrink:0;border-radius:10px;overflow:hidden;cursor:pointer;
+  border:2px solid transparent;background:var(--pink-soft);display:grid;place-items:center;transition:.15s}
+.thumb.on{border-color:var(--pink-deep)}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb .ph{font-size:15px;color:var(--pink-deep)}
+
+.empty{text-align:center;color:var(--sub);padding:60px 0;font-size:15px}
+
+/* 라이트박스 */
+.lb{position:fixed;inset:0;background:rgba(60,30,45,.72);backdrop-filter:blur(4px);
+  display:none;place-items:center;z-index:60;padding:24px;cursor:zoom-out}
+.lb.on{display:grid}
+.lb img{max-width:92vw;max-height:88vh;object-fit:contain;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.lb .lbcap{position:absolute;bottom:22px;left:0;right:0;text-align:center;color:#fff;font-family:var(--disp);font-size:18px;text-shadow:0 2px 8px rgba(0,0,0,.5)}
+
+footer{position:relative;z-index:1;margin-top:56px;padding:34px 0 44px;text-align:center;border-top:1px solid var(--line)}
+footer .cloud{font-size:22px;letter-spacing:6px;color:var(--pink);opacity:.85}
+footer p{margin-top:10px;font-size:13px;color:var(--sub)}
+
+@media(max-width:680px){ .menu{gap:20px} .stage{height:300px} }
+</style>
+</head>
+<body>
+
+<div id="sky"></div>
+
+<header class="top"><div class="wrap">
+  <a href="index.html" class="logo">쿠<b>룽</b><span class="v">v</span></a>
+  <nav class="menu">
+    <a href="index.html">메인</a>
+    <a href="summary.html">방송 히스토리</a>
+    <a href="monthly.html" class="on">월간쿠룽</a>
+    <a href="orders.html">주문내역</a>
+  </nav>
+</div></header>
+
+<main class="content"><div class="wrap">
+  <div class="mhead">
+    <div class="en">Monthly Kurung</div>
+    <h2>월간 쿠룽 · 화보집</h2>
+  </div>
+
+  <div class="viewer" id="viewer">
+    <div class="empty" id="empty">불러오는 중…</div>
+
+    <div id="body" style="display:none">
+      <div class="vmain">
+        <button class="arw" id="prev" aria-label="이전">‹</button>
+        <div class="stage" id="stage" onclick="openLb()"><span class="ph">🖼️</span></div>
+        <button class="arw" id="next" aria-label="다음">›</button>
+      </div>
+      <div class="cap">
+        <div class="t" id="cap-t"></div>
+        <div class="d" id="cap-d"></div>
+      </div>
+      <div class="thumbs-row">
+        <button class="tarw" id="tprev" aria-label="이전 목록">‹</button>
+        <div class="thumbs" id="thumbs"></div>
+        <button class="tarw" id="tnext" aria-label="다음 목록">›</button>
+      </div>
+    </div>
+  </div>
+</div></main>
+
+<footer><div class="wrap">
+  <div class="cloud">☁ ✦ ☁</div>
+  <p>© 2026 쿠룽v</p>
+</div></footer>
+
+<div class="lb" id="lb" onclick="closeLb()">
+  <img id="lb-img" src="" alt="">
+  <div class="lbcap" id="lb-cap"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+var DEBUG=false;
+var SUPA={ url:'https://vamcglwzfydknvgivaho.supabase.co', anonKey:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZhbWNnbHd6Znlka252Z2l2YWhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NTE5MTksImV4cCI6MjEwMDEyNzkxOX0.3C7MXa4RL-iJaVZ7ueAGxYSY2CeOqAdAGt4FEQKrrk0' };
+var sb=(SUPA.url && window.supabase) ? window.supabase.createClient(SUPA.url, SUPA.anonKey) : null;
+
+var PER=5, page=0, sel=0, PHOTOS=[];
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function showMain(i){
+  if(!PHOTOS.length) return;
+  sel=(i+PHOTOS.length)%PHOTOS.length;
+  var p=PHOTOS[sel], stage=document.getElementById('stage');
+  stage.innerHTML = p.image_url
+    ? '<img src="'+esc(p.image_url)+'" alt="'+esc(p.title)+'" onerror="this.parentNode.innerHTML=\'<span class=&quot;ph&quot;>🖼️</span>\'">'
+    : '<span class="ph">🖼️</span>';
+  document.getElementById('cap-t').textContent=p.title||'';
+  document.getElementById('cap-d').textContent=p.description||'';
+  page=Math.floor(sel/PER);
+  renderThumbs();
+}
+function renderThumbs(){
+  var wrap=document.getElementById('thumbs');
+  var start=page*PER, list=PHOTOS.slice(start,start+PER);
+  wrap.innerHTML=list.map(function(p,k){
+    var idx=start+k;
+    var inner=p.image_url?'<img src="'+esc(p.image_url)+'" alt="">':'<span class="ph">🖼️</span>';
+    return '<div class="thumb'+(idx===sel?' on':'')+'" data-i="'+idx+'">'+inner+'</div>';
+  }).join('');
+  Array.prototype.forEach.call(wrap.querySelectorAll('.thumb'),function(el){
+    el.addEventListener('click',function(){ showMain(+el.dataset.i); });
+  });
+  var totalPages=Math.ceil(PHOTOS.length/PER);
+  document.getElementById('tprev').disabled=(page<=0);
+  document.getElementById('tnext').disabled=(page>=totalPages-1);
+}
+function openLb(){
+  var p=PHOTOS[sel]; if(!p||!p.image_url) return;
+  document.getElementById('lb-img').src=p.image_url;
+  document.getElementById('lb-cap').textContent=p.title||'';
+  document.getElementById('lb').classList.add('on');
+}
+function closeLb(){document.getElementById('lb').classList.remove('on');}
+
+async function load(){
+  var rows=[];
+  try{
+    if(sb){
+      var res=await sb.from('gallery').select('*').order('sort_order',{ascending:true}).order('created_at',{ascending:false});
+      if(res.error) throw res.error;
+      rows=res.data||[];
+    }
+  }catch(e){ if(DEBUG) console.warn('gallery',e && e.message); }
+  PHOTOS=rows;
+  if(!PHOTOS.length){
+    document.getElementById('empty').textContent='아직 등록된 화보가 없어요 🍃';
+    return;
+  }
+  document.getElementById('empty').style.display='none';
+  document.getElementById('body').style.display='block';
+  document.getElementById('prev').addEventListener('click',function(){ showMain(sel-1); });
+  document.getElementById('next').addEventListener('click',function(){ showMain(sel+1); });
+  document.getElementById('tprev').addEventListener('click',function(){ if(page>0){page--;renderThumbs();} });
+  document.getElementById('tnext').addEventListener('click',function(){ if((page+1)*PER<PHOTOS.length){page++;renderThumbs();} });
+  showMain(0);
+}
+load();
+
+/* 배경 반짝이 */
+(function(){
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  var sky=document.getElementById('sky'),g=['✦','♡','✧','⋆','☁'];
+  for(var i=0;i<14;i++){
+    var s=document.createElement('span');s.className='spark';s.textContent=g[i%g.length];
+    s.style.left=(Math.random()*100)+'%';s.style.fontSize=(11+Math.random()*16)+'px';
+    s.style.color=i%2?'var(--pink)':'var(--yellow)';
+    s.style.animationDuration=(11+Math.random()*10)+'s';s.style.animationDelay=(-Math.random()*18)+'s';
+    sky.appendChild(s);
+  }
+})();
+</script>
+</body>
+</html>
