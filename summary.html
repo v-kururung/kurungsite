@@ -46,7 +46,7 @@ a{color:inherit;text-decoration:none}
 .shead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px}
 .stitle{display:flex;align-items:baseline;gap:11px}
 .stitle .mark{align-self:center;flex-shrink:0;color:var(--pink);font-size:17px;line-height:1}
-.stitle h2{font-family:var(--disp);font-weight:400;font-size:27px;color:var(--ink);letter-spacing:.5px}
+.stitle h2{font-family:var(--disp);font-weight:400;font-size:27px;color:var(--ink);letter-spacing:.5px;white-space:nowrap}
 .stitle .range{font-family:var(--latin);font-weight:500;font-size:15px;color:var(--sub)}
 
 /* 검색창 */
@@ -69,7 +69,7 @@ a{color:inherit;text-decoration:none}
 .vthumb .vph{position:absolute;inset:0;display:grid;place-items:center;font-size:34px;opacity:.7}
 .vthumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
 .vbody{padding:15px 17px 17px;display:flex;flex-direction:column;gap:9px;flex:1}
-.vtitle{font-size:16.5px;line-height:1.35;color:var(--ink);
+.vtitle{font-size:16.5px;line-height:1.35;color:var(--ink);word-break:keep-all;overflow-wrap:break-word;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .vdate{font-family:var(--latin);font-size:13px;color:var(--sub);letter-spacing:.3px}
 .vtags{display:flex;flex-wrap:wrap;gap:6px}
