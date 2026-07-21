@@ -74,7 +74,7 @@ a{color:inherit;text-decoration:none}
 .vdate{font-family:var(--latin);font-size:13px;color:var(--sub);letter-spacing:.3px}
 .vtags{display:flex;flex-wrap:wrap;gap:6px}
 .vtags span{background:var(--pink-soft);color:var(--pink-deep);font-size:12px;padding:3px 10px;border-radius:20px}
-.vlabel{margin-top:auto;font-size:12.5px;color:var(--sub);margin-bottom:3px}
+.vlabel{margin-top:auto;font-size:12.5px;color:var(--sub);margin-bottom:-5px}
 .vlinks{display:flex;gap:8px;padding-top:0}
 .vlinks a{display:flex;align-items:center;gap:6px;font-size:13px;padding:8px 14px;border-radius:12px;
   background:var(--page);color:var(--ink);transition:.2s}
@@ -215,10 +215,6 @@ function card(b){
   var soopUrl=(b.soop_url&&String(b.soop_url).trim());
   var soopOk=soopAlive(b.broadcast_date);
   var links='';
-  /* 유튜브 — URL 있으면 링크, 없으면 준비중 */
-  links += yt
-    ? '<a href="'+esc(b.youtube_url)+'" target="_blank" rel="noopener"><img src="youtube.png" alt="">유튜브</a>'
-    : '<a class="soon" onclick="showSoon(\'유튜브\')"><img src="youtube.png" alt="">유튜브</a>';
   /* 숲 — 살아있고 URL 있으면 링크 / 아직 없으면 준비중 / 기간 지나면 만료 안내 */
   if(soopOk && soopUrl){
     links += '<a href="'+esc(b.soop_url)+'" target="_blank" rel="noopener"><img src="soop.png" alt="">숲</a>';
@@ -227,6 +223,10 @@ function card(b){
   }else{
     links += '<a class="soon" onclick="showSoon(\'숲 VOD\')"><img src="soop.png" alt="">숲</a>';
   }
+  /* 유튜브 — URL 있으면 링크, 없으면 준비중 */
+  links += yt
+    ? '<a href="'+esc(b.youtube_url)+'" target="_blank" rel="noopener"><img src="youtube.png" alt="">유튜브</a>'
+    : '<a class="soon" onclick="showSoon(\'유튜브\')"><img src="youtube.png" alt="">유튜브</a>';
   return '<div class="vcard"><div class="vthumb"><div class="vph">🎬</div>'+img+'</div>'+
     '<div class="vbody"><div class="vtitle">'+esc(b.title||'무제')+'</div>'+
     '<div class="vdate">'+fmtDate(b.broadcast_date)+'</div>'+
