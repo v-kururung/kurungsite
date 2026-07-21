@@ -121,7 +121,7 @@ footer p{margin-top:10px;font-size:13px;color:var(--sub)}
   <a href="index.html" class="logo">쿠<b>룽</b><span class="v">v</span></a>
   <nav class="menu">
     <a href="index.html">메인</a>
-    <a href="summary.html" class="on">방송요약</a>
+    <a href="summary.html" class="on">방송 히스토리</a>
     <a href="monthly.html">월간쿠룽</a>
     <a href="orders.html">주문내역</a>
   </nav>
@@ -131,7 +131,7 @@ footer p{margin-top:10px;font-size:13px;color:var(--sub)}
   <div class="shead">
     <div class="stitle">
       <span class="mark">❀</span>
-      <h2>방송 요약</h2>
+      <h2>방송 히스토리</h2>
       <span class="range" id="count"></span>
     </div>
     <div class="search">
@@ -164,14 +164,6 @@ var SUPA={ url:'https://vamcglwzfydknvgivaho.supabase.co', anonKey:'eyJhbGciOiJI
 var sb=(SUPA.url && window.supabase) ? window.supabase.createClient(SUPA.url, SUPA.anonKey) : null;
 
 var SOOP_DAYS=90;   /* 숲 VOD 유지 기간(일). 이 기간 지나면 숲 버튼 자동 숨김 */
-
-/* 등록 전 미리보기용 예시 — 실제 방송이 등록되면 자동으로 사라져요 */
-var SAMPLE=[
-  {title:'파스모포비아 공포게임 (with. 게스트)', broadcast_date:'2026-07-21T20:00:00+09:00',
-   tags:'공포, 종겜', youtube_url:'https://youtu.be/dQw4w9WgXcQ', soop_url:'https://www.sooplive.com/station/kururung', thumbnail_url:''},
-  {title:'첫 방송! 자기소개 & 소통 타임', broadcast_date:'2026-08-01T20:00:00+09:00',
-   tags:'데뷔, 소통', youtube_url:'', soop_url:'https://www.sooplive.com/station/kururung', thumbnail_url:''}
-];
 
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
@@ -256,12 +248,13 @@ function renderPage(){
   if(page>totalPages) page=totalPages;
 
   if(!total){
-    grid.innerHTML='<div class="vempty">검색 결과가 없어요 🍃</div>';
+    var q=(document.getElementById('q').value||'').trim();
+    grid.innerHTML='<div class="vempty">'+(q?'검색 결과가 없어요 🍃':'아직 등록된 방송이 없어요 🍃')+'</div>';
   }else{
     var start=(page-1)*PER_PAGE;
     grid.innerHTML=FILTERED.slice(start,start+PER_PAGE).map(card).join('');
   }
-  var c=document.getElementById('count'); if(c) c.textContent='총 '+total+'개';
+  var c=document.getElementById('count'); if(c) c.textContent=total?('총 '+total+'개'):'';
   renderPager(totalPages);
 }
 
@@ -300,7 +293,6 @@ async function load(){
       rows=res.data||[];
     }
   }catch(e){ if(DEBUG) console.warn('broadcasts',e && e.message); }
-  if(!rows.length) rows=SAMPLE;   /* 아직 등록된 방송이 없으면 예시 표시 */
   ALL=rows;
   applyFilter();
 }

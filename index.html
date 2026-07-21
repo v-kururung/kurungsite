@@ -107,6 +107,9 @@ a{color:inherit;text-decoration:none}
 .rows .k{width:110px;color:var(--sub);flex-shrink:0}
 .rows .v{color:var(--ink)}
 .rows .v b{color:var(--pink-deep)}
+.dday{display:inline-block;margin-left:6px;background:var(--pink);color:#fff;
+  font-family:var(--latin);font-weight:600;font-size:11.5px;padding:2px 9px;border-radius:20px;
+  vertical-align:middle;letter-spacing:.3px}
 .bubble{margin-top:16px;background:var(--yellow-soft);border-radius:16px 16px 16px 4px;
   padding:11px 18px;font-family:var(--hand);font-size:25px;line-height:1.3;color:var(--ink);align-self:flex-start}
 
@@ -164,7 +167,7 @@ a{color:inherit;text-decoration:none}
   <a href="index.html" class="logo">쿠<b>룽</b><span class="v">v</span></a>
   <nav class="menu">
     <a href="index.html" class="on">메인</a>
-    <a href="summary.html">방송요약</a>
+    <a href="summary.html">방송 히스토리</a>
     <a href="monthly/">월간쿠룽</a>
     <a href="orders/">주문내역</a>
   </nav>
@@ -196,7 +199,7 @@ a{color:inherit;text-decoration:none}
       <div class="rows">
         <div class="r"><span class="k">종족</span><span class="v">선녀</span></div>
         <div class="r"><span class="k">나이</span><span class="v">1,000살</span></div>
-        <div class="r"><span class="k">데뷔일</span><span class="v"><b>2026년 8월 1일</b></span></div>
+        <div class="r"><span class="k">데뷔일</span><span class="v"><b>2026년 8월 1일</b> <span class="dday" id="dday"></span></span></div>
         <div class="r"><span class="k">팬덤명</span><span class="v">나무꾼 🌲</span></div>
         <div class="r"><span class="k">팬 고정닉</span><span class="v">/l/닉네임</span></div>
         <div class="r"><span class="k">주요 컨텐츠</span><span class="v">소통 · 종합게임</span></div>
@@ -334,6 +337,17 @@ async function renderWeek(){
 function startPolling(){renderWeek();setInterval(renderWeek,POLL_MS);}
 function scheduleMondayRollover(){var now=new Date();var nm=mondayOf(now);nm.setDate(nm.getDate()+7);setTimeout(function(){renderWeek();scheduleMondayRollover();},(nm-now)+1000);}
 startPolling();scheduleMondayRollover();
+
+/* 데뷔일(2026-08-01) D-day */
+(function(){
+  var el=document.getElementById('dday'); if(!el) return;
+  var now=new Date(); now.setHours(0,0,0,0);
+  var debut=new Date(2026,7,1);            // 2026년 8월 1일
+  var diff=Math.round((debut-now)/86400000);
+  if(diff>0) el.textContent='D-'+diff;      // 데뷔 전
+  else if(diff===0){ el.textContent='D-DAY'; }  // 당일
+  else el.textContent='데뷔 '+(-diff+1)+'일째';  // 데뷔 후
+})();
 
 function openAsk(){document.getElementById('ov').classList.add('on');document.getElementById('nick').focus();}
 function closeAsk(){document.getElementById('ov').classList.remove('on');var s=document.getElementById('askStatus');if(s)s.textContent='';}
