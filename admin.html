@@ -44,20 +44,20 @@
         <h3 id="bHead">방송 히스토리 등록</h3>
         <div class="frow"><label>제목</label><input id="bTitle" spellcheck="false" autocomplete="off" placeholder="방송 제목을 입력해주세요."></div>
         <div class="frow"><label>방송일</label><input id="bDate" type="datetime-local" autocomplete="off"></div>
-        <div class="frow top"><label>태그</label>
+        <div class="frow ftop"><label>태그</label>
           <div>
-            <input id="bTagInput" spellcheck="false" autocomplete="off" placeholder="태그 입력 후 엔터 (ex. 소통)">
+            <input id="bTagInput" spellcheck="false" autocomplete="off" placeholder="태그 입력 후 엔터">
             <div class="chips" id="bChips"></div>
           </div>
         </div>
-        <div class="frow top"><label>영상 주소</label>
+        <div class="frow ftop"><label>영상 주소</label>
           <div>
             <input id="bUrlInput" spellcheck="false" autocomplete="off"
                    placeholder="영상 주소 입력 후 엔터">
             <div class="chips" id="bUrlChips"></div>
           </div>
         </div>
-        <div class="frow top"><label>썸네일</label>
+        <div class="frow ftop"><label>썸네일</label>
           <div>
             <div style="display:flex;gap:8px;align-items:stretch">
               <div class="drop small" id="bDrop" style="flex:1"><span class="big">🖼</span><span>직접 올리기 — 선택 또는 끌어다 놓기</span></div>
@@ -92,7 +92,7 @@
         <div class="preview" id="prev"><img id="prevImg" src="" alt=""></div>
         <div style="margin-top:16px">
           <div class="frow"><label>제목</label><input id="gTitle" spellcheck="false" autocomplete="off" placeholder="제목을 입력해주세요."></div>
-          <div class="frow top"><label>설명</label><textarea id="gDesc" rows="3" spellcheck="false" autocomplete="off" placeholder="설명을 입력해주세요."></textarea></div>
+          <div class="frow ftop"><label>설명</label><textarea id="gDesc" rows="3" spellcheck="false" autocomplete="off" placeholder="설명을 입력해주세요."></textarea></div>
         </div>
         <div class="actions">
           <span class="stat" id="gStat"></span>
@@ -719,8 +719,8 @@ async function loadBroadcast(){
         .map(function(x){return '<span class="tag">#'+esc(x)+'</span>';}).join('');
       var thumb=(b.thumbnail_url&&b.thumbnail_url.trim())||ytThumb(b.youtube_url);
       var th=thumb
-        ? '<img class="thumb64" style="width:88px;height:56px" src="'+esc(thumb)+'" alt="">'
-        : '<div class="thumb64" style="width:88px;height:56px"></div>';
+        ? '<img class="thumb-wide" src="'+esc(thumb)+'" alt="">'
+        : '<div class="thumb-wide"></div>';
       return '<div class="item'+(bEditId===b.id?' editing':'')+'" draggable="true" data-i="'+i+'">'+
         '<span class="grip" title="끌어서 순서 바꾸기"><i></i><i></i><i></i><i></i><i></i><i></i></span>'+th+
         '<div class="body"><div class="t">'+esc(b.title)+'</div>'+
