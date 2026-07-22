@@ -54,6 +54,9 @@ body{background:#f7f5f7}
 .btn.del{background:#fff;color:#6f6a72;border:1.5px solid #e3dee4}
 .btn.del:hover{background:#fff0f4;border-color:#e79aae;color:#b3455f}
 .hint{font-size:12.5px;color:#7a757e;margin-top:6px}
+.lhead{display:flex;align-items:center;gap:8px;margin:26px 4px 11px;
+  font-family:var(--disp);font-weight:400;font-size:18px;color:var(--ink)}
+.lhead::before{content:"";width:9px;height:9px;border-radius:3px;background:var(--pink);flex-shrink:0}
 .stat{font-size:13px;color:var(--pink-deep);min-height:18px}
 
 .drop{border:1.5px dashed #ddd8dd;border-radius:14px;padding:26px 20px;text-align:center;
@@ -207,9 +210,8 @@ mark{background:#ffe9a8;color:inherit;border-radius:3px;padding:0 1px}
         <div class="frow top"><label>영상 주소</label>
           <div>
             <input id="bUrlInput" spellcheck="false" autocomplete="off"
-                   placeholder="영상 주소 입력 후 엔터 (숲 · 유튜브 자동 구분)">
+                   placeholder="영상 주소 입력 후 엔터">
             <div class="chips" id="bUrlChips"></div>
-            <div class="hint">주소를 넣지 않은 플랫폼은 사이트에서 '준비 중'으로 표시돼요</div>
           </div>
         </div>
         <div class="frow top"><label>썸네일</label>
@@ -230,7 +232,7 @@ mark{background:#ffe9a8;color:inherit;border-radius:3px;padding:0 1px}
           <button class="btn" id="bSubmit" onclick="saveBroadcast()">등록하기</button>
         </div>
       </div>
-      <div class="hint" style="margin:0 4px 8px">점 6개를 잡고 끌어서 순서를 바꿀 수 있어요</div>
+      <div class="lhead">영상 순서 관리</div>
       <div class="list" id="bList"></div>
     </div>
 
@@ -255,7 +257,7 @@ mark{background:#ffe9a8;color:inherit;border-radius:3px;padding:0 1px}
           <button class="btn" id="gSubmit" onclick="saveGallery()">등록하기</button>
         </div>
       </div>
-      <div class="hint" style="margin:0 4px 8px">점 6개를 잡고 끌어서 순서를 바꿀 수 있어요</div>
+      <div class="lhead">화보 순서 관리</div>
       <div class="list" id="gList"></div>
     </div>
 
@@ -405,7 +407,7 @@ async function loadGallery(){
     if(!GAL.length){ box.innerHTML='<div class="empty2">등록된 화보가 없어요</div>'; return; }
     box.innerHTML=GAL.map(function(g,i){
       return '<div class="item'+(gEditId===g.id?' editing':'')+'" draggable="true" data-i="'+i+'">'+
-        '<span class="grip"><i></i><i></i><i></i><i></i><i></i><i></i></span>'+
+        '<span class="grip" title="끌어서 순서 바꾸기"><i></i><i></i><i></i><i></i><i></i><i></i></span>'+
         (g.image_url?'<img class="thumb64" src="'+esc(g.image_url)+'" alt="">':'<div class="thumb64"></div>')+
         '<div class="body"><div class="t">'+esc(g.title)+'</div>'+
         '<div class="m">'+esc(String(g.created_at||'').slice(0,16))+'</div>'+
@@ -655,8 +657,17 @@ function thumbLoaded(img){
 }
 function thumbFailed(img){
   var card=cardOf(img); if(!card) return;
-  var i=+card.getAttribute('data-i');
-  if(CAND[i]) CAND[i].dead=true;
+  var i=+card.getAttribute('data-i'), c=CAND[i];
+  /* 다음 화질이 남아 있으면 그걸로 갈아끼웁니다 */
+  if(c && c.alts && c.alts.length){
+    var wasSel=(c.src===bUrl);
+    c.src=c.alts.shift();
+    card.setAttribute('title',c.src);
+    if(wasSel) bUrl=c.src;
+    img.src=c.src;
+    return;
+  }
+  if(c) c.dead=true;
   card.style.display='none';
   card.classList.remove('on');
   if(CAND[i] && CAND[i].src===bUrl){ bUrl=''; selectFirstAlive(); }
@@ -702,7 +713,7 @@ async function fetchOg(url, p){
       console.warn('[ogimage]', p.field, r.status, j);
       return { ok:false, label:p.label, msg:(j.error||('HTTP '+r.status)) };
     }
-    addCand({ src:j.image, field:p.field, label:p.label, icon:p.icon, note:'미리보기' });
+    addCand({ src:j.image, field:p.field, label:p.label, icon:p.icon, note:'' });
     return { ok:true };
   }catch(e){
     console.error(e);
@@ -731,10 +742,11 @@ async function refreshThumbs(manual){
     var u=URLS[p.field]; if(!u) return;
     var id=ytId(u);
     if(id){
-      [['maxresdefault','고화질'],['sddefault','중간'],['hqdefault','기본']].forEach(function(q){
-        addCand({ src:'https://img.youtube.com/vi/'+id+'/'+q[0]+'.jpg',
-                  field:p.field, label:p.label, icon:p.icon, note:q[1] });
-      });
+      /* 가장 좋은 화질부터 시도하고, 없으면 아래 화질로 자동으로 내려갑니다 */
+      var vi='https://img.youtube.com/vi/'+id+'/';
+      addCand({ src:vi+'maxresdefault.jpg',
+                alts:[vi+'sddefault.jpg', vi+'hqdefault.jpg'],
+                field:p.field, label:p.label, icon:p.icon, note:'' });
     }else{
       jobs.push(fetchOg(u,p));
     }
@@ -855,7 +867,7 @@ async function loadBroadcast(){
         ? '<img class="thumb64" style="width:88px;height:56px" src="'+esc(thumb)+'" alt="">'
         : '<div class="thumb64" style="width:88px;height:56px"></div>';
       return '<div class="item'+(bEditId===b.id?' editing':'')+'" draggable="true" data-i="'+i+'">'+
-        '<span class="grip"><i></i><i></i><i></i><i></i><i></i><i></i></span>'+th+
+        '<span class="grip" title="끌어서 순서 바꾸기"><i></i><i></i><i></i><i></i><i></i><i></i></span>'+th+
         '<div class="body"><div class="t">'+esc(b.title)+'</div>'+
         '<div class="m">'+esc(String(b.broadcast_date||'').replace('T',' '))+'</div>'+
         (tags?'<div style="margin-top:6px">'+tags+'</div>':'')+
