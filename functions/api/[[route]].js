@@ -173,14 +173,41 @@ export async function onRequest(context) {
       if (method === 'PUT' && id) {                /* 처리 여부 변경 */
         if (!isAdmin(request, env)) return fail('unauthorized', 401);
         const q = await request.json();
-        await env.DB.prepare('UPDATE inquiries SET done=? WHERE id=?')
-          .bind(q.done ? 1 : 0, id).run();
+        try {
+          await env.DB.prepare('UPDATE inquiries SET done=? WHERE id=?')
+            .bind(q.done ? 1 : 0, id).run();
+        } catch (_) {
+          return fail("done 컬럼이 없습니다. D1에서 다음을 실행하세요: ALTER TABLE inquiries ADD COLUMN done INTEGER DEFAULT 0;", 409);
+        }
         return ok({ updated: true });
       }
       if (method === 'DELETE' && id) {
         if (!isAdmin(request, env)) return fail('unauthorized', 401);
         await env.DB.prepare('DELETE FROM inquiries WHERE id=?').bind(id).run();
         return ok({ deleted: true });
+      }
+    }
+
+    /* ───── 링크 미리보기 이미지 가져오기: GET /api/ogimage?url=... ───── */
+    if (seg === 'ogimage' && method === 'GET') {
+      if (!isAdmin(request, env)) return fail('unauthorized', 401);
+      const target = new URL(request.url).searchParams.get('url');
+      if (!target) return fail('no url');
+      try {
+        const r = await fetch(target, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LinkPreview/1.0)' }
+        });
+        const html = await r.text();
+        const pick = (re) => { const m = html.match(re); return m ? m[1] : ''; };
+        let img =
+          pick(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+          pick(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i) ||
+          pick(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
+        if (!img) return fail('no image found', 404);
+        if (img.startsWith('//')) img = 'https:' + img;
+        return ok({ image: img });
+      } catch (e) {
+        return fail('fetch failed', 502);
       }
     }
 

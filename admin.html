@@ -46,7 +46,7 @@ body{background:#f7f5f7}
 .btn{border:none;background:var(--pink);color:#fff;padding:11px 26px;border-radius:14px;
   font-family:var(--body);font-size:14px;cursor:pointer}
 .btn:hover{background:var(--pink-deep)}
-.itembtns{display:flex;flex-direction:column;gap:6px;flex-shrink:0;width:74px}
+.itembtns{display:flex;flex-direction:column;gap:8px;flex-shrink:0;width:86px;align-items:flex-end}
 .btn.edit,.btn.del{width:100%;padding:7px 0;font-size:12.5px;border-radius:10px;text-align:center;
   font-family:var(--body);cursor:pointer;transition:.15s}
 .btn.edit{background:var(--pink) !important;color:#fff !important;border:1.5px solid var(--pink)}
@@ -94,7 +94,15 @@ body{background:#f7f5f7}
 .copyable:hover{background:var(--pink-soft);border-radius:4px}
 .item.done{opacity:.5}
 .item.done .t{text-decoration:line-through}
-.chk{display:flex;align-items:center;gap:6px;font-size:12.5px;color:#5d5860;
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips:empty{margin-top:0}
+.chip{display:inline-flex;align-items:center;gap:6px;background:#f2f0f3;color:#5d5860;
+  font-size:12.5px;padding:5px 8px 5px 11px;border-radius:7px}
+.chip b{font-weight:400}
+.chip button{border:none;background:none;color:#9a949d;cursor:pointer;font-size:14px;
+  line-height:1;padding:0 1px}
+.chip button:hover{color:#c4556f}
+.chk{display:flex;align-items:center;gap:6px;font-size:12.5px;color:#5d5860;white-space:nowrap;
   cursor:pointer;user-select:none;white-space:nowrap}
 .chk input{width:15px;height:15px;accent-color:var(--pink);cursor:pointer;margin:0}
 .donebadge{display:inline-block;background:#f2f0f3;color:#5d5860;
@@ -151,7 +159,12 @@ body{background:#f7f5f7}
         <h3 id="bHead">방송 히스토리 등록</h3>
         <div class="frow"><label>제목</label><input id="bTitle" spellcheck="false" autocomplete="off" placeholder="방송 제목을 입력해주세요."></div>
         <div class="frow"><label>방송일</label><input id="bDate" type="datetime-local" autocomplete="off"></div>
-        <div class="frow"><label>태그</label><input id="bTags" spellcheck="false" autocomplete="off" placeholder="쉼표로 구분(ex. 소통, 종겜)"></div>
+        <div class="frow top"><label>태그</label>
+          <div>
+            <input id="bTagInput" spellcheck="false" autocomplete="off" placeholder="태그 입력 후 엔터 (ex. 소통)">
+            <div class="chips" id="bChips"></div>
+          </div>
+        </div>
         <div class="frow"><label>숲 주소</label><input id="bSoop" spellcheck="false" autocomplete="off" placeholder="비워두면 '준비 중'으로 표시"></div>
         <div class="frow"><label>유튜브 주소</label><input id="bYt" spellcheck="false" autocomplete="off" placeholder="비워두면 '준비 중'으로 표시"></div>
         <div class="frow top"><label>썸네일</label>
@@ -398,10 +411,56 @@ bindDrop(document.getElementById('bDrop'), document.getElementById('bFile'), fun
 });
 
 var bEditId=null;
+var TAGS=[];
+
+function renderChips(){
+  document.getElementById('bChips').innerHTML = TAGS.map(function(t,i){
+    return '<span class="chip"><b>#'+esc(t)+'</b><button onclick="removeTag('+i+')">×</button></span>';
+  }).join('');
+}
+function addTag(v){
+  v=String(v||'').trim().replace(/^#/,'');
+  if(!v) return;
+  v.split(',').forEach(function(x){
+    x=x.trim().replace(/^#/,'');
+    if(x && TAGS.indexOf(x)<0) TAGS.push(x);
+  });
+  renderChips();
+}
+function removeTag(i){ TAGS.splice(i,1); renderChips(); }
+(function(){
+  var el=document.getElementById('bTagInput');
+  el.addEventListener('keydown',function(e){
+    if(e.key==='Enter'||e.key===','){ e.preventDefault(); addTag(el.value); el.value=''; }
+    else if(e.key==='Backspace' && !el.value && TAGS.length){ TAGS.pop(); renderChips(); }
+  });
+  el.addEventListener('blur',function(){ if(el.value.trim()){ addTag(el.value); el.value=''; } });
+})();
+
+/* 숲·유튜브 주소에서 썸네일 가져오기 */
+async function fetchThumb(){
+  var url=(document.getElementById('bSoop').value||'').trim()
+        ||(document.getElementById('bYt').value||'').trim();
+  var st=document.getElementById('bStat');
+  if(!url){ st.textContent='먼저 숲이나 유튜브 주소를 입력해 주세요'; return; }
+  toast('썸네일 가져오는 중…');
+  try{
+    var r=await fetch(API+'/ogimage?url='+encodeURIComponent(url),{headers:DB.headers(false)});
+    if(!r.ok) throw new Error();
+    var j=await r.json();
+    bUrl=j.image;
+    document.getElementById('bPrevImg').src=j.image;
+    document.getElementById('bPrev').style.display='block';
+    st.textContent='';
+    toast('썸네일을 가져왔어요');
+  }catch(e){ toast('가져오지 못했어요 — 직접 올려주세요'); }
+}
+
 
 function cancelBroadcast(){
   bEditId=null; bUrl='';
-  ['bTitle','bTags','bSoop','bYt'].forEach(function(id){ document.getElementById(id).value=''; });
+  ['bTitle','bTagInput','bSoop','bYt'].forEach(function(id){ document.getElementById(id).value=''; });
+  TAGS=[]; renderChips();
   document.getElementById('bPrev').style.display='none';
   document.getElementById('bHead').textContent='방송 히스토리 등록';
   document.getElementById('bSubmit').textContent='등록하기';
@@ -416,7 +475,7 @@ function editBroadcast(id){
   bEditId=id; bUrl=b.thumbnail_url||'';
   document.getElementById('bTitle').value=b.title||'';
   document.getElementById('bDate').value=(b.broadcast_date||'').slice(0,16);
-  document.getElementById('bTags').value=b.tags||'';
+  TAGS=String(b.tags||'').split(',').map(function(x){return x.trim();}).filter(Boolean); renderChips();
   document.getElementById('bSoop').value=b.soop_url||'';
   document.getElementById('bYt').value=b.youtube_url||'';
   if(bUrl){ document.getElementById('bPrevImg').src=bUrl;
@@ -436,7 +495,7 @@ async function saveBroadcast(){
   var row={
     title:t,
     broadcast_date:document.getElementById('bDate').value||'',
-    tags:document.getElementById('bTags').value.trim(),
+    tags:TAGS.join(', '),
     soop_url:document.getElementById('bSoop').value.trim(),
     youtube_url:document.getElementById('bYt').value.trim(),
     thumbnail_url:bUrl, sort_order:0
@@ -524,7 +583,7 @@ async function loadInquiry(){
         '<div class="msg">'+esc(q.message)+'</div>'+
         '</div><div class="itembtns">'+
         '<label class="chk"><input type="checkbox" '+(isDone?'checked':'')+
-        ' onchange="toggleDone('+q.id+',this.checked)">처리</label>'+
+        ' onchange="toggleDone('+q.id+',this.checked)">처리 완료</label>'+
         '<button class="btn del" onclick="delItem(\'inquiries\','+q.id+')">삭제</button>'+
         '</div></div>';
     }).join('');
