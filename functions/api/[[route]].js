@@ -235,9 +235,18 @@ export async function onRequest(context) {
       }
     }
 
-    /* ───── 관리자 토큰 확인 (로그인용) ───── */
-    if (seg === 'auth' && method === 'POST') {
-      return isAdmin(request, env) ? ok({ ok: true }) : fail('unauthorized', 401);
+    /* ───── 관리자 토큰 확인 ───── */
+    if (seg === 'auth') {
+      /* GET /api/auth — 진단용.
+         ADMIN_TOKEN 이 이 함수에 연결됐는지만 true/false 로 알려줍니다.
+         값 자체는 절대 나가지 않습니다. 원인 확인 후 지워도 됩니다. */
+      if (method === 'GET') {
+        return ok({ configured: !!env.ADMIN_TOKEN });
+      }
+      /* POST /api/auth — 실제 로그인 확인 */
+      if (method === 'POST') {
+        return isAdmin(request, env) ? ok({ ok: true }) : fail('unauthorized', 401);
+      }
     }
 
     return fail('not found', 404);
