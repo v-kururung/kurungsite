@@ -66,7 +66,7 @@
             </div>
             <input type="file" id="bFile" accept="image/*" style="display:none">
             <div class="thumbpick" id="bThumbs"></div>
-            <div class="hint" id="bThumbHint">주소를 넣으면 썸네일 후보가 여기 뜹니다. 하나를 골라주세요.</div>
+            <div class="hint" id="bThumbHint" style="display:none"></div>
           </div>
         </div>
         <div class="actions">
@@ -547,14 +547,14 @@ function markSelection(){
     });
 }
 function updateThumbHint(){
+  var hint=document.getElementById('bThumbHint');
+  if(!hint) return;                      /* 안내 문구를 지워도 동작하도록 */
   var alive=0, i;
   for(i=0;i<CAND.length;i++) if(!CAND[i].dead) alive++;
-  var hint=document.getElementById('bThumbHint');
-  if(alive){ hint.style.display='none'; return; }
+  /* 주소는 넣었는데 가져온 썸네일이 하나도 없을 때만 알려줍니다 */
+  if(alive || !Object.keys(URLS).length){ hint.style.display='none'; return; }
   hint.style.display='block';
-  hint.textContent = Object.keys(URLS).length
-    ? '가져온 썸네일이 없어요 — 직접 올려주세요'
-    : '주소를 넣으면 썸네일 후보가 여기 뜹니다. 하나를 골라주세요.';
+  hint.textContent='가져온 썸네일이 없어요 — 직접 올려주세요';
 }
 
 /* 플랫폼별로 방식이 달라서 따로 처리합니다.
