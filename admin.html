@@ -27,20 +27,23 @@
 .frow.top{align-items:flex-start}
 .frow label{font-size:14px;color:var(--sub)}
 .frow input,.frow textarea{width:100%;border:1.5px solid var(--line);border-radius:12px;
-  padding:10px 13px;font-family:var(--body);font-size:14px;background:var(--page);
+  padding:10px 13px;font-family:var(--body);font-size:14px;background:#fff;
   color:var(--ink);outline:none;resize:vertical}
 .frow input:focus,.frow textarea:focus{border-color:var(--pink)}
 .actions{display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-top:18px}
 .btn{border:none;background:var(--pink);color:#fff;padding:11px 26px;border-radius:14px;
   font-family:var(--body);font-size:14px;cursor:pointer}
 .btn:hover{background:var(--pink-deep)}
+.btn.edit{background:var(--pink-soft);color:var(--pink-deep);padding:6px 12px;font-size:12.5px;margin-right:6px}
+.btn.edit:hover{background:var(--pink);color:#fff}
+.itembtns{display:flex;flex-direction:column;gap:6px;flex-shrink:0}
 .btn.del{background:transparent;color:#c46;border:1.5px solid var(--line);padding:6px 12px;font-size:12.5px}
 .btn.del:hover{background:#fee;border-color:#c46}
 .hint{font-size:12.5px;color:var(--sub);margin-top:6px}
 .stat{font-size:13px;color:var(--pink-deep);min-height:18px}
 
 .drop{border:2px dashed var(--line);border-radius:16px;padding:30px 20px;text-align:center;
-  color:var(--sub);cursor:pointer;transition:.2s;background:var(--page)}
+  color:var(--sub);cursor:pointer;transition:.2s;background:#fff}
 .drop:hover,.drop.over{border-color:var(--pink);background:var(--pink-soft);color:var(--pink-deep)}
 .drop .big{font-size:30px;display:block;margin-bottom:6px}
 .drop.small{padding:16px;font-size:13px}
@@ -78,7 +81,7 @@
 .login h2{font-family:var(--disp);font-weight:400;font-size:22px;margin-bottom:6px}
 .login p{font-size:13.5px;color:var(--sub);margin-bottom:18px}
 .login input{width:100%;border:1.5px solid var(--line);border-radius:14px;padding:12px 14px;
-  font-family:var(--body);font-size:14px;background:var(--page);color:var(--ink);
+  font-family:var(--body);font-size:14px;background:#fff;color:var(--ink);
   outline:none;margin-bottom:12px;text-align:center}
 .login input:focus{border-color:var(--pink)}
 @media(max-width:640px){ .frow{grid-template-columns:1fr;gap:4px} }
@@ -115,7 +118,7 @@
     <!-- ───── 화보 ───── -->
     <div class="panel on" id="p-gallery">
       <div class="box">
-        <h3>화보 올리기</h3>
+        <h3 id="gHead">화보 올리기</h3>
         <div class="drop" id="drop">
           <span class="big">📷</span>
           사진을 끌어다 놓거나 클릭해서 선택
@@ -129,7 +132,8 @@
         </div>
         <div class="actions">
           <span class="stat" id="gStat"></span>
-          <button class="btn" onclick="saveGallery()">등록하기</button>
+          <button class="btn ghost" id="gCancel" style="display:none;background:var(--pink-soft);color:var(--pink-deep)" onclick="cancelGallery()">취소</button>
+          <button class="btn" id="gSubmit" onclick="saveGallery()">등록하기</button>
         </div>
       </div>
       <div class="hint" style="margin:0 4px 8px">⋮⋮ 를 잡고 끌어서 순서를 바꿀 수 있어요</div>
@@ -139,7 +143,7 @@
     <!-- ───── 방송 ───── -->
     <div class="panel" id="p-broadcast">
       <div class="box">
-        <h3>방송 등록</h3>
+        <h3 id="bHead">방송 등록</h3>
         <div class="frow"><label>제목</label><input id="bTitle" spellcheck="false" placeholder="방송 제목을 입력해주세요."></div>
         <div class="frow"><label>방송일</label><input id="bDate" type="datetime-local"></div>
         <div class="frow"><label>태그</label><input id="bTags" spellcheck="false" placeholder="쉼표로 구분(ex. 소통, 종겜)"></div>
@@ -155,9 +159,11 @@
         </div>
         <div class="actions">
           <span class="stat" id="bStat"></span>
-          <button class="btn" onclick="saveBroadcast()">등록하기</button>
+          <button class="btn ghost" id="bCancel" style="display:none;background:var(--pink-soft);color:var(--pink-deep)" onclick="cancelBroadcast()">취소</button>
+          <button class="btn" id="bSubmit" onclick="saveBroadcast()">등록하기</button>
         </div>
       </div>
+      <div class="hint" style="margin:0 4px 8px">⋮⋮ 를 잡고 끌어서 순서를 바꿀 수 있어요</div>
       <div class="list" id="bList"></div>
     </div>
 
@@ -244,22 +250,51 @@ bindDrop(document.getElementById('drop'), document.getElementById('file'), funct
   document.getElementById('prev').style.display='block';
 });
 
+var gEditId=null;
+
+function cancelGallery(){
+  gEditId=null; gUrl='';
+  document.getElementById('gTitle').value='';
+  document.getElementById('gDesc').value='';
+  document.getElementById('prev').style.display='none';
+  document.getElementById('gHead').textContent='화보 올리기';
+  document.getElementById('gSubmit').textContent='등록하기';
+  document.getElementById('gCancel').style.display='none';
+  document.getElementById('gStat').textContent='';
+}
+
+function editGallery(id){
+  var g=GAL.filter(function(x){return x.id===id;})[0]; if(!g) return;
+  gEditId=id; gUrl=g.image_url||'';
+  document.getElementById('gTitle').value=g.title||'';
+  document.getElementById('gDesc').value=g.description||'';
+  if(gUrl){ document.getElementById('prevImg').src=gUrl;
+            document.getElementById('prev').style.display='block'; }
+  document.getElementById('gHead').textContent='화보 수정';
+  document.getElementById('gSubmit').textContent='수정 완료';
+  document.getElementById('gCancel').style.display='inline-block';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
 async function saveGallery(){
   var s=document.getElementById('gStat');
   if(!gUrl){ s.textContent='먼저 사진을 올려주세요'; return; }
   var t=document.getElementById('gTitle').value.trim();
   if(!t){ s.textContent='제목을 입력해 주세요'; return; }
   s.textContent='저장 중…';
+  var row={ title:t, description:document.getElementById('gDesc').value.trim(),
+            image_url:gUrl, sort_order:0 };
   try{
-    await DB.insert('gallery',{
-      title:t, description:document.getElementById('gDesc').value.trim(),
-      image_url:gUrl, sort_order:0
-    });
-    s.textContent=''; gUrl='';
-    document.getElementById('gTitle').value='';
-    document.getElementById('gDesc').value='';
-    document.getElementById('prev').style.display='none';
-    toast('등록됐어요 🎉');
+    if(gEditId){
+      var cur=GAL.filter(function(x){return x.id===gEditId;})[0];
+      row.sort_order = cur?(cur.sort_order||0):0;
+      await DB.update('gallery',gEditId,row);
+      toast('수정됐어요 ✏️');
+    }else{
+      await DB.insert('gallery',row);
+      toast('등록됐어요 🎉');
+    }
+    cancelGallery();
     loadGallery();
   }catch(e){ s.textContent='저장 실패 ㅠㅠ'; }
 }
@@ -277,16 +312,18 @@ async function loadGallery(){
         '<div class="body"><div class="t">'+esc(g.title)+'</div>'+
         '<div class="m">'+esc(String(g.created_at||'').slice(0,16))+'</div>'+
         (g.description?'<div class="msg">'+esc(g.description)+'</div>':'')+'</div>'+
-        '<button class="btn del" onclick="delItem(\'gallery\','+g.id+')">삭제</button></div>';
+        '<div class="itembtns">'+
+        '<button class="btn edit" onclick="editGallery('+g.id+')">수정</button>'+
+        '<button class="btn del" onclick="delItem(\'gallery\','+g.id+')">삭제</button></div></div>';
     }).join('');
-    bindDrag();
+    bindDrag('#gList', GAL, saveGalleryOrder);
   }catch(e){ box.innerHTML='<div class="empty2">불러오기 실패</div>'; }
 }
 
-/* 드래그로 순서 바꾸기 */
+/* 드래그로 순서 바꾸기 (공통) */
 var dragI=null;
-function bindDrag(){
-  var items=document.querySelectorAll('#gList .item');
+function bindDrag(sel, arr, onSave){
+  var items=document.querySelectorAll(sel+' .item');
   items.forEach(function(el){
     el.addEventListener('dragstart',function(){ dragI=+el.dataset.i; el.classList.add('dragging'); });
     el.addEventListener('dragend',function(){ el.classList.remove('dragging');
@@ -297,22 +334,22 @@ function bindDrag(){
       e.preventDefault();
       var to=+el.dataset.i;
       if(dragI===null||dragI===to) return;
-      var moved=GAL.splice(dragI,1)[0];
-      GAL.splice(to,0,moved);
+      var moved=arr.splice(dragI,1)[0];
+      arr.splice(to,0,moved);
       dragI=null;
-      await saveOrder();
+      await onSave();
     });
   });
 }
-async function saveOrder(){
+
+async function saveGalleryOrder(){
   toast('순서 저장 중…');
   try{
     for(var i=0;i<GAL.length;i++){
       var g=GAL[i];
       if(g.sort_order!==i){
-        await DB.update('gallery',g.id,{
-          title:g.title, description:g.description, image_url:g.image_url, sort_order:i
-        });
+        await DB.update('gallery',g.id,{title:g.title,description:g.description,
+          image_url:g.image_url,sort_order:i});
         g.sort_order=i;
       }
     }
@@ -329,45 +366,112 @@ bindDrop(document.getElementById('bDrop'), document.getElementById('bFile'), fun
   document.getElementById('bPrev').style.display='block';
 });
 
+var bEditId=null;
+
+function cancelBroadcast(){
+  bEditId=null; bUrl='';
+  ['bTitle','bTags','bSoop','bYt'].forEach(function(id){ document.getElementById(id).value=''; });
+  document.getElementById('bPrev').style.display='none';
+  document.getElementById('bHead').textContent='방송 등록';
+  document.getElementById('bSubmit').textContent='등록하기';
+  document.getElementById('bCancel').style.display='none';
+  document.getElementById('bStat').textContent='';
+  setToday();
+}
+
+function editBroadcast(id){
+  var b=BC.filter(function(x){return x.id===id;})[0]; if(!b) return;
+  bEditId=id; bUrl=b.thumbnail_url||'';
+  document.getElementById('bTitle').value=b.title||'';
+  document.getElementById('bDate').value=(b.broadcast_date||'').slice(0,16);
+  document.getElementById('bTags').value=b.tags||'';
+  document.getElementById('bSoop').value=b.soop_url||'';
+  document.getElementById('bYt').value=b.youtube_url||'';
+  if(bUrl){ document.getElementById('bPrevImg').src=bUrl;
+            document.getElementById('bPrev').style.display='block'; }
+  document.getElementById('bHead').textContent='방송 수정';
+  document.getElementById('bSubmit').textContent='수정 완료';
+  document.getElementById('bCancel').style.display='inline-block';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
 async function saveBroadcast(){
   var s=document.getElementById('bStat');
   var t=document.getElementById('bTitle').value.trim();
   if(!t){ s.textContent='제목을 입력해 주세요'; return; }
   s.textContent='저장 중…';
+  var row={
+    title:t,
+    broadcast_date:document.getElementById('bDate').value||'',
+    tags:document.getElementById('bTags').value.trim(),
+    soop_url:document.getElementById('bSoop').value.trim(),
+    youtube_url:document.getElementById('bYt').value.trim(),
+    thumbnail_url:bUrl, sort_order:0
+  };
   try{
-    await DB.insert('broadcasts',{
-      title:t,
-      broadcast_date:document.getElementById('bDate').value||'',
-      tags:document.getElementById('bTags').value.trim(),
-      soop_url:document.getElementById('bSoop').value.trim(),
-      youtube_url:document.getElementById('bYt').value.trim(),
-      thumbnail_url:bUrl
-    });
-    s.textContent=''; bUrl='';
-    ['bTitle','bTags','bSoop','bYt'].forEach(function(id){ document.getElementById(id).value=''; });
-    document.getElementById('bPrev').style.display='none';
-    setToday();
-    toast('등록됐어요 🎉');
+    if(bEditId){
+      var cur=BC.filter(function(x){return x.id===bEditId;})[0];
+      row.sort_order = cur?(cur.sort_order||0):0;
+      await DB.update('broadcasts',bEditId,row);
+      toast('수정됐어요 ✏️');
+    }else{
+      await DB.insert('broadcasts',row);
+      toast('등록됐어요 🎉');
+    }
+    cancelBroadcast();
     loadBroadcast();
   }catch(e){ s.textContent='저장 실패 ㅠㅠ'; }
 }
 
+/* 유튜브 자동 썸네일 */
+function ytThumb(url){
+  if(!url) return '';
+  var m=String(url).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|live\/|embed\/|v\/|shorts\/))([A-Za-z0-9_-]{11})/);
+  return m?('https://img.youtube.com/vi/'+m[1]+'/hqdefault.jpg'):'';
+}
+
+var BC=[];
 async function loadBroadcast(){
   var box=document.getElementById('bList');
   try{
-    var rows=await DB.list('broadcasts');
-    if(!rows.length){ box.innerHTML='<div class="empty2">등록된 방송이 없어요</div>'; return; }
-    box.innerHTML=rows.map(function(b){
+    BC=await DB.list('broadcasts');
+    if(!BC.length){ box.innerHTML='<div class="empty2">등록된 방송이 없어요</div>'; return; }
+    box.innerHTML=BC.map(function(b,i){
       var tags=String(b.tags||'').split(',').map(function(x){return x.trim();}).filter(Boolean)
         .map(function(x){return '<span class="tag">#'+esc(x)+'</span>';}).join('');
-      var th=b.thumbnail_url?'<img class="thumb64" src="'+esc(b.thumbnail_url)+'" alt="">':'';
-      return '<div class="item">'+th+'<div class="body">'+
-        '<div class="t">'+esc(b.title)+'</div>'+
+      var thumb=(b.thumbnail_url&&b.thumbnail_url.trim())||ytThumb(b.youtube_url);
+      var th=thumb
+        ? '<img class="thumb64" style="width:88px;height:56px" src="'+esc(thumb)+'" alt="">'
+        : '<div class="thumb64" style="width:88px;height:56px"></div>';
+      return '<div class="item" draggable="true" data-i="'+i+'">'+
+        '<span class="grip">⋮⋮</span>'+th+
+        '<div class="body"><div class="t">'+esc(b.title)+'</div>'+
         '<div class="m">'+esc(String(b.broadcast_date||'').replace('T',' '))+'</div>'+
         (tags?'<div style="margin-top:6px">'+tags+'</div>':'')+
-        '</div><button class="btn del" onclick="delItem(\'broadcasts\','+b.id+')">삭제</button></div>';
+        '</div><div class="itembtns">'+
+        '<button class="btn edit" onclick="editBroadcast('+b.id+')">수정</button>'+
+        '<button class="btn del" onclick="delItem(\'broadcasts\','+b.id+')">삭제</button></div></div>';
     }).join('');
+    bindDrag('#bList', BC, saveBroadcastOrder);
   }catch(e){ box.innerHTML='<div class="empty2">불러오기 실패</div>'; }
+}
+
+async function saveBroadcastOrder(){
+  toast('순서 저장 중…');
+  try{
+    for(var i=0;i<BC.length;i++){
+      var b=BC[i];
+      if(b.sort_order!==i){
+        await DB.update('broadcasts',b.id,{
+          title:b.title, broadcast_date:b.broadcast_date, tags:b.tags,
+          soop_url:b.soop_url, youtube_url:b.youtube_url,
+          thumbnail_url:b.thumbnail_url, sort_order:i});
+        b.sort_order=i;
+      }
+    }
+    toast('순서가 바뀌었어요');
+    loadBroadcast();
+  }catch(e){ toast('순서 저장 실패'); }
 }
 
 /* ───── 문의 ───── */

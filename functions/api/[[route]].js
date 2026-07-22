@@ -66,7 +66,7 @@ export async function onRequest(context) {
     if (seg === 'broadcasts') {
       if (method === 'GET') {
         const { results } = await env.DB
-          .prepare('SELECT * FROM broadcasts ORDER BY broadcast_date DESC')
+          .prepare('SELECT * FROM broadcasts ORDER BY sort_order ASC, created_at DESC')
           .all();
         return ok(results || []);
       }
@@ -74,10 +74,10 @@ export async function onRequest(context) {
         if (!isAdmin(request, env)) return fail('unauthorized', 401);
         const b = await request.json();
         await env.DB.prepare(
-          `INSERT INTO broadcasts (title, broadcast_date, tags, youtube_url, soop_url, thumbnail_url)
-           VALUES (?, ?, ?, ?, ?, ?)`
+          `INSERT INTO broadcasts (title, broadcast_date, tags, youtube_url, soop_url, thumbnail_url, sort_order)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
         ).bind(b.title || '', b.broadcast_date || '', b.tags || '',
-               b.youtube_url || '', b.soop_url || '', b.thumbnail_url || '').run();
+               b.youtube_url || '', b.soop_url || '', b.thumbnail_url || '', b.sort_order || 0).run();
         return ok({ saved: true });
       }
       if (method === 'PUT' && id) {
@@ -85,9 +85,9 @@ export async function onRequest(context) {
         const b = await request.json();
         await env.DB.prepare(
           `UPDATE broadcasts SET title=?, broadcast_date=?, tags=?,
-           youtube_url=?, soop_url=?, thumbnail_url=? WHERE id=?`
+           youtube_url=?, soop_url=?, thumbnail_url=?, sort_order=? WHERE id=?`
         ).bind(b.title || '', b.broadcast_date || '', b.tags || '',
-               b.youtube_url || '', b.soop_url || '', b.thumbnail_url || '', id).run();
+               b.youtube_url || '', b.soop_url || '', b.thumbnail_url || '', b.sort_order || 0, id).run();
         return ok({ updated: true });
       }
       if (method === 'DELETE' && id) {
