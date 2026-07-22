@@ -46,7 +46,7 @@ body{background:#f7f5f7}
 .btn{border:none;background:var(--pink);color:#fff;padding:11px 26px;border-radius:14px;
   font-family:var(--body);font-size:14px;cursor:pointer}
 .btn:hover{background:var(--pink-deep)}
-.itembtns{display:flex;flex-direction:column;gap:8px;flex-shrink:0;width:86px;align-items:flex-end}
+.itembtns{display:flex;flex-direction:column;gap:8px;flex-shrink:0;width:90px;align-items:stretch}
 .btn.edit,.btn.del{width:100%;padding:7px 0;font-size:12.5px;border-radius:10px;text-align:center;
   font-family:var(--body);cursor:pointer;transition:.15s}
 .btn.edit{background:var(--pink) !important;color:#fff !important;border:1.5px solid var(--pink)}
@@ -94,6 +94,12 @@ body{background:#f7f5f7}
 .copyable:hover{background:var(--pink-soft);border-radius:4px}
 .item.done{opacity:.5}
 .item.done .t{text-decoration:line-through}
+.isearch{position:relative;margin-bottom:14px}
+.isearch input{width:100%;border:1.5px solid #e3dee4;border-radius:12px;background:#fff;
+  padding:10px 14px 10px 38px;font-family:var(--body);font-size:14px;color:var(--ink);outline:none}
+.isearch input:focus{border-color:var(--pink)}
+.isearch .si{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#9a949d;font-size:14px}
+mark{background:#ffe9a8;color:inherit;border-radius:3px;padding:0 1px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .chips:empty{margin-top:0}
 .chip{display:inline-flex;align-items:center;gap:6px;background:#f2f0f3;color:#5d5860;
@@ -102,7 +108,7 @@ body{background:#f7f5f7}
 .chip button{border:none;background:none;color:#9a949d;cursor:pointer;font-size:14px;
   line-height:1;padding:0 1px}
 .chip button:hover{color:#c4556f}
-.chk{display:flex;align-items:center;gap:6px;font-size:12.5px;color:#5d5860;white-space:nowrap;
+.chk{display:flex;align-items:center;justify-content:center;gap:6px;font-size:12.5px;color:#5d5860;white-space:nowrap;height:31px;
   cursor:pointer;user-select:none;white-space:nowrap}
 .chk input{width:15px;height:15px;accent-color:var(--pink);cursor:pointer;margin:0}
 .donebadge{display:inline-block;background:#f2f0f3;color:#5d5860;
@@ -212,6 +218,11 @@ body{background:#f7f5f7}
 
     <!-- ───── 문의 ───── -->
     <div class="panel" id="p-inquiry">
+      <div class="isearch">
+        <span class="si">&#128269;</span>
+        <input id="iq" spellcheck="false" autocomplete="off"
+               placeholder="닉네임 · 연락처 · 내용 검색" oninput="renderInquiry()">
+      </div>
       <div class="list" id="iList"></div>
     </div>
   </div>
@@ -567,27 +578,48 @@ async function saveBroadcastOrder(){
 }
 
 /* ───── 문의 ───── */
+var INQ=[];
+
+function hl(text, q){
+  var e=esc(text);
+  if(!q) return e;
+  var rx=new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
+  return e.replace(rx,'<mark>$1</mark>');
+}
+
 async function loadInquiry(){
+  try{ INQ=await DB.list('inquiries'); }
+  catch(e){ document.getElementById('iList').innerHTML='<div class="empty2">불러오기 실패</div>'; return; }
+  renderInquiry();
+}
+
+function renderInquiry(){
   var box=document.getElementById('iList');
-  try{
-    var rows=await DB.list('inquiries');
-    if(!rows.length){ box.innerHTML='<div class="empty2">받은 문의가 없어요</div>'; return; }
-    box.innerHTML=rows.map(function(q){
-      var isDone = !!(q.done && q.done!=='0');
-      var c=q.contact
-        ? '<span class="copyable" onclick="copyText(this.textContent)">'+esc(q.contact)+'</span>'
-        : '<span style="color:var(--sub)">연락처 없음</span>';
-      return '<div class="item'+(isDone?' done':'')+'"><div class="body">'+
-        '<div class="t">'+esc(q.nickname)+(isDone?'<span class="donebadge">처리완료</span>':'')+'</div>'+
-        '<div class="m">'+esc(String(q.created_at||'').slice(0,16))+' · '+c+'</div>'+
-        '<div class="msg">'+esc(q.message)+'</div>'+
-        '</div><div class="itembtns">'+
-        '<label class="chk"><input type="checkbox" '+(isDone?'checked':'')+
-        ' onchange="toggleDone('+q.id+',this.checked)">처리 완료</label>'+
-        '<button class="btn del" onclick="delItem(\'inquiries\','+q.id+')">삭제</button>'+
-        '</div></div>';
-    }).join('');
-  }catch(e){ box.innerHTML='<div class="empty2">불러오기 실패</div>'; }
+  var q=(document.getElementById('iq').value||'').trim();
+  var lower=q.toLowerCase();
+  var rows = q ? INQ.filter(function(x){
+    return ((x.nickname||'')+' '+(x.contact||'')+' '+(x.message||'')).toLowerCase().indexOf(lower)>=0;
+  }) : INQ;
+
+  if(!rows.length){
+    box.innerHTML='<div class="empty2">'+(q?'검색 결과가 없어요':'받은 문의가 없어요')+'</div>';
+    return;
+  }
+  box.innerHTML=rows.map(function(x){
+    var isDone = !!(x.done && x.done!=='0');
+    var c=x.contact
+      ? '<span class="copyable" onclick="copyText(this.textContent)">'+hl(x.contact,q)+'</span>'
+      : '<span style="color:#9a949d">연락처 없음</span>';
+    return '<div class="item'+(isDone?' done':'')+'"><div class="body">'+
+      '<div class="t">'+hl(x.nickname,q)+(isDone?'<span class="donebadge">처리완료</span>':'')+'</div>'+
+      '<div class="m">'+esc(String(x.created_at||'').slice(0,16))+' · '+c+'</div>'+
+      '<div class="msg">'+hl(x.message,q)+'</div>'+
+      '</div><div class="itembtns">'+
+      '<label class="chk"><input type="checkbox" '+(isDone?'checked':'')+
+      ' onchange="toggleDone('+x.id+',this.checked)">처리 완료</label>'+
+      '<button class="btn del" onclick="delItem(\'inquiries\','+x.id+')">삭제</button>'+
+      '</div></div>';
+  }).join('');
 }
 
 async function toggleDone(id, val){

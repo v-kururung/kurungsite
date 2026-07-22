@@ -195,19 +195,43 @@ export async function onRequest(context) {
       if (!target) return fail('no url');
       try {
         const r = await fetch(target, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LinkPreview/1.0)' }
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'ko-KR,ko;q=0.9,en;q=0.8'
+          },
+          redirect: 'follow'
         });
+        if (!r.ok) return fail('페이지를 열지 못했어요 (HTTP ' + r.status + ')', 502);
         const html = await r.text();
-        const pick = (re) => { const m = html.match(re); return m ? m[1] : ''; };
-        let img =
-          pick(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
-          pick(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i) ||
-          pick(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
-        if (!img) return fail('no image found', 404);
+
+        /* meta 태그를 속성 순서와 무관하게 찾습니다 */
+        const findMeta = (names) => {
+          const tags = html.match(/<meta\s[^>]*>/gi) || [];
+          for (const tag of tags) {
+            const key = (tag.match(/(?:property|name)\s*=\s*["']([^"']+)["']/i) || [])[1];
+            if (!key || names.indexOf(key.toLowerCase()) < 0) continue;
+            const val = (tag.match(/content\s*=\s*["']([^"']*)["']/i) || [])[1];
+            if (val) return val;
+          }
+          return '';
+        };
+
+        let img = findMeta(['og:image', 'og:image:url', 'og:image:secure_url', 'twitter:image', 'twitter:image:src']);
+        if (!img) {
+          const m = html.match(/<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i);
+          if (m) img = m[1];
+        }
+        if (!img) return fail('이 페이지에서 썸네일을 찾지 못했어요', 404);
+
+        /* HTML 엔티티 복원 + 상대경로 보정 */
+        img = img.replace(/&amp;/g, '&').replace(/&#38;/g, '&').replace(/&quot;/g, '"').trim();
         if (img.startsWith('//')) img = 'https:' + img;
+        else if (img.startsWith('/')) img = new URL(target).origin + img;
+
         return ok({ image: img });
       } catch (e) {
-        return fail('fetch failed', 502);
+        return fail('가져오기 실패: ' + (e.message || 'unknown'), 502);
       }
     }
 
