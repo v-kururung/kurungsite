@@ -784,7 +784,7 @@ function renderInquiry(){
     var isDone = !!(x.done && x.done!=='0');
     var c=x.contact
       ? '<span class="copyable" onclick="copyText(this.textContent)">'+hl(x.contact,q)+'</span>'
-      : '<span style="color:#9a949d">연락처 없음</span>';
+      : '<span style="color:var(--a-faint)">연락처 없음</span>';
     return '<div class="item'+(isDone?' done':'')+'"><div class="body">'+
       '<div class="t">'+hl(x.nickname,q)+(isDone?'<span class="donebadge">처리완료</span>':'')+'</div>'+
       '<div class="m">'+esc(kst(x.created_at))+' · '+c+'</div>'+
