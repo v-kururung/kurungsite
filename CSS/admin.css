@@ -70,10 +70,13 @@ button,input,textarea{font-family:var(--a-font)}
 .panel.on{display:block}
 
 /* ───── 버튼 체계 ─────
-   .btn        주요   — 진한 핑크 채움 (등록 · 수정 완료)
-   .btn.sub    서브   — 옅은 핑크 면   (취소 · 다시 가져오기)
-   .btn.ghost  기타   — 흰 면 + 테두리 (로그아웃 등 중립 동작)
-   .btn.del    위험   — 중립이었다가 호버 시 붉게 (삭제)      */
+   한 화면에서 시선이 가야 할 곳은 하나뿐이라, 채워진 핑크는
+   그 영역의 최종 확정 동작에만 씁니다.
+
+   1) 주요 .btn        진한 핑크 채움   — 등록하기 · 수정 완료
+   2) 서브 .btn.sub    옅은 핑크 면     — 취소 · 주소에서 다시 가져오기 · 목록의 수정
+   3) 기타 .btn.ghost  흰 면 + 테두리   — 로그아웃 등 중립 동작
+   4) 삭제 .btn.del    평소엔 기타와 같고, 호버할 때만 붉게      */
 .btn{border:none;background:var(--a-primary);color:#fff;padding:10px 22px;
   border-radius:var(--a-radius);font-size:14px;font-weight:600;cursor:pointer;transition:.15s}
 .btn:hover{background:var(--a-primary-hover)}
@@ -86,9 +89,10 @@ button,input,textarea{font-family:var(--a-font)}
 .btn.ghost:hover,.ahead .out:hover{border-color:var(--a-line-strong);color:var(--a-ink)}
 .btn.edit,.btn.del{width:100%;padding:7px 0;font-size:12.5px;border-radius:10px;
   text-align:center;cursor:pointer;transition:.15s}
-.btn.edit{background:var(--a-primary);color:#fff;border:1px solid var(--a-primary)}
-.btn.edit:hover{background:var(--a-primary-hover);border-color:var(--a-primary-hover)}
-.btn.del{background:var(--a-surface);color:var(--a-sub);border:1px solid var(--a-line);font-weight:500}
+.btn.edit{background:var(--a-primary-soft);color:var(--a-primary-ink);
+  border:1px solid var(--a-primary-soft)}
+.btn.edit:hover{background:#f7d6e8;border-color:#eeb9d7}
+.btn.del{background:var(--a-surface);color:var(--a-faint);border:1px solid var(--a-line);font-weight:500}
 .btn.del:hover{background:var(--a-danger-soft);border-color:#eaa9b5;color:var(--a-danger)}
 
 /* ───── 카드(영역) ───── */
