@@ -66,8 +66,6 @@ body{background:#f7f5f7}
 .preview{margin-top:12px;display:none;text-align:center}
 .preview img{max-width:190px;max-height:230px;border-radius:12px;display:inline-block;
   box-shadow:0 6px 16px rgba(0,0,0,.08)}
-#bPrev{margin-top:10px}
-#bPrev img{max-height:112px;border-radius:10px}
 
 .list{display:flex;flex-direction:column;gap:10px}
 .item{background:#fff;border:1px solid #ece7ed;border-radius:14px;padding:14px 16px;
@@ -108,6 +106,41 @@ mark{background:#ffe9a8;color:inherit;border-radius:3px;padding:0 1px}
 .chip button{border:none;background:none;color:#9a949d;cursor:pointer;font-size:14px;
   line-height:1;padding:0 1px}
 .chip button:hover{color:#c4556f}
+/* 영상 주소 태그 */
+.urlchip{display:inline-flex;align-items:center;gap:6px;max-width:100%;
+  background:#f2f0f3;color:#5d5860;border:1px solid #e3dee4;
+  font-size:12.5px;padding:5px 8px 5px 10px;border-radius:8px}
+.urlchip img.pf{width:15px;height:15px;object-fit:contain;flex-shrink:0}
+.urlchip b{font-weight:500;flex-shrink:0}
+.urlchip .u{font-family:var(--latin);font-size:12px;opacity:.75;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.urlchip button{border:none;background:none;color:#9a949d;cursor:pointer;
+  font-size:14px;line-height:1;padding:0 1px;flex-shrink:0}
+.urlchip button:hover{color:#c4556f}
+.urlchip.youtube{background:#fdeced;border-color:#f7ccd0;color:#a32830}
+.urlchip.soop{background:#eaf1fd;border-color:#cfe0f8;color:#1d4f9c}
+
+/* 썸네일 고르기 */
+.thumbpick{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));
+  gap:10px;margin-top:12px}
+.thumbpick:empty{margin-top:0}
+.tcard{position:relative;border:2px solid #e3dee4;border-radius:12px;overflow:hidden;
+  background:#fff;cursor:pointer;transition:.15s;padding:0;text-align:left;width:100%;
+  font-family:var(--body)}
+.tcard:hover{border-color:var(--pink-deep)}
+.tcard.on{border-color:var(--pink);box-shadow:0 0 0 3px var(--pink-soft)}
+.tcard:focus-visible{outline:2px solid var(--pink-deep);outline-offset:2px}
+.tcard>img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#f2f0f3}
+.tcard .src{display:flex;align-items:center;gap:5px;padding:6px 9px;
+  font-size:11.5px;color:#7a757e;line-height:1.3}
+.tcard .src img{width:13px;height:13px;object-fit:contain;flex-shrink:0}
+.tcard .src span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tcard .ck{position:absolute;top:7px;right:7px;width:21px;height:21px;border-radius:50%;
+  background:var(--pink);color:#fff;font-size:12px;line-height:21px;text-align:center;
+  display:none;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.tcard.on .ck{display:block}
+@media(prefers-reduced-motion:reduce){.tcard{transition:none}}
+
 .chk{display:flex;align-items:center;justify-content:center;gap:6px;font-size:12.5px;color:#5d5860;white-space:nowrap;height:31px;
   cursor:pointer;user-select:none;white-space:nowrap}
 .chk input{width:15px;height:15px;accent-color:var(--pink);cursor:pointer;margin:0}
@@ -171,17 +204,24 @@ mark{background:#ffe9a8;color:inherit;border-radius:3px;padding:0 1px}
             <div class="chips" id="bChips"></div>
           </div>
         </div>
-        <div class="frow"><label>숲 주소</label><input id="bSoop" spellcheck="false" autocomplete="off" placeholder="비워두면 '준비 중'으로 표시"></div>
-        <div class="frow"><label>유튜브 주소</label><input id="bYt" spellcheck="false" autocomplete="off" placeholder="비워두면 '준비 중'으로 표시"></div>
+        <div class="frow top"><label>영상 주소</label>
+          <div>
+            <input id="bUrlInput" spellcheck="false" autocomplete="off"
+                   placeholder="영상 주소 입력 후 엔터 (숲 · 유튜브 자동 구분)">
+            <div class="chips" id="bUrlChips"></div>
+            <div class="hint">주소를 넣지 않은 플랫폼은 사이트에서 '준비 중'으로 표시돼요</div>
+          </div>
+        </div>
         <div class="frow top"><label>썸네일</label>
           <div>
             <div style="display:flex;gap:8px;align-items:stretch">
-              <div class="drop small" id="bDrop" style="flex:1"><span class="big">🖼</span><span>사진 선택 또는 끌어다 놓기</span></div>
-              <button type="button" class="btn" id="bFetch" onclick="fetchThumb(true)"
-                style="padding:0 14px;font-size:12.5px;white-space:nowrap;border-radius:12px">주소에서 가져오기</button>
+              <div class="drop small" id="bDrop" style="flex:1"><span class="big">🖼</span><span>직접 올리기 — 선택 또는 끌어다 놓기</span></div>
+              <button type="button" class="btn" id="bFetch" onclick="refreshThumbs(true)"
+                style="padding:0 14px;font-size:12.5px;white-space:nowrap;border-radius:12px">주소에서 다시 가져오기</button>
             </div>
             <input type="file" id="bFile" accept="image/*" style="display:none">
-            <div class="preview" id="bPrev" style="text-align:left"><img id="bPrevImg" src="" alt="" style="max-height:140px"></div>
+            <div class="thumbpick" id="bThumbs"></div>
+            <div class="hint" id="bThumbHint">주소를 넣으면 썸네일 후보가 여기 뜹니다. 하나를 골라주세요.</div>
           </div>
         </div>
         <div class="actions">
@@ -417,13 +457,7 @@ async function saveGalleryOrder(){
 }
 
 /* ───── 방송 ───── */
-var bUrl='';
-bindDrop(document.getElementById('bDrop'), document.getElementById('bFile'), function(url){
-  bUrl=url;
-  document.getElementById('bPrevImg').src=url;
-  document.getElementById('bPrev').style.display='block';
-});
-
+var bUrl='';          /* 최종 선택된 썸네일 주소 */
 var bEditId=null;
 var TAGS=[];
 
@@ -451,65 +485,294 @@ function removeTag(i){ TAGS.splice(i,1); renderChips(); }
   el.addEventListener('blur',function(){ if(el.value.trim()){ addTag(el.value); el.value=''; } });
 })();
 
-/* 숲·유튜브 주소에서 썸네일 가져오기 */
-async function fetchThumb(manual){
-  var soop=(document.getElementById('bSoop').value||'').trim();
-  var yt=(document.getElementById('bYt').value||'').trim();
-  var st=document.getElementById('bStat');
+/* ═════════ 영상 주소 (플랫폼 자동 구분) ═════════ */
 
-  function apply(img){
-    bUrl=img;
-    document.getElementById('bPrevImg').src=img;
-    document.getElementById('bPrev').style.display='block';
-    st.textContent='';
-    toast('썸네일을 가져왔어요');
+/* config.js 의 broadcast.platforms 를 기준으로 삼고,
+   주소를 알아보는 규칙만 여기서 보강합니다.
+   config 쪽 platforms 항목에 match:'정규식' 을 넣으면 그 값이 우선합니다. */
+var PLATFORMS = (function(){
+  var known = {
+    youtube_url: { key:'youtube', label:'유튜브', icon:'youtube.png',
+                   re:/(?:^|\.)(?:youtube\.com|youtube-nocookie\.com|youtu\.be)$/i },
+    soop_url   : { key:'soop',    label:'숲',    icon:'soop.png',
+                   re:/(?:^|\.)(?:sooplive\.co\.kr|sooplive\.com|afreecatv\.com)$/i }
+  };
+  var out = ((CFG.broadcast&&CFG.broadcast.platforms)||[]).map(function(p){
+    var k = known[p.field] || {};
+    return {
+      field: p.field,
+      key  : k.key || String(p.field).replace(/_url$/,''),
+      label: p.label || k.label || p.field,
+      icon : p.icon  || k.icon  || '🔗',
+      re   : p.match ? new RegExp(p.match,'i') : (k.re||null)
+    };
+  });
+  /* config 에 빠진 플랫폼이 있어도 주소는 인식되게 */
+  Object.keys(known).forEach(function(f){
+    for(var i=0;i<out.length;i++) if(out[i].field===f) return;
+    var k=known[f];
+    out.push({ field:f, key:k.key, label:k.label, icon:k.icon, re:k.re });
+  });
+  return out;
+})();
+
+var URLS = {};   /* { soop_url:'…', youtube_url:'…' } */
+
+function pfByField(f){
+  for(var i=0;i<PLATFORMS.length;i++) if(PLATFORMS[i].field===f) return PLATFORMS[i];
+  return null;
+}
+function pfIcon(p, cls){
+  return /\.(png|jpg|jpeg|svg|webp|gif)$/i.test(p.icon||'')
+    ? '<img class="'+cls+'" src="'+esc(p.icon)+'" alt="">'
+    : '<span class="'+cls+'">'+esc(p.icon||'🔗')+'</span>';
+}
+function normUrl(v){
+  v=String(v||'').trim().replace(/^["'<]+|[>"']+$/g,'');
+  if(!v) return '';
+  if(!/^https?:\/\//i.test(v)) v='https://'+v.replace(/^\/+/,'');
+  return v;
+}
+function hostOf(url){
+  try{ return new URL(url).hostname.replace(/^www\./i,''); }catch(e){ return ''; }
+}
+/* 주소를 보고 어느 플랫폼인지 판별 */
+function detectField(url){
+  var host=hostOf(url); if(!host) return '';
+  for(var i=0;i<PLATFORMS.length;i++){
+    var p=PLATFORMS[i];
+    if(p.re && p.re.test(host)) return p.field;
   }
-
-  /* 1) 유튜브는 주소에서 바로 뽑기 (서버 요청 불필요) */
-  var y=ytThumb(yt);
-  if(y){ apply(y); return; }
-
-  /* 2) 그 외(숲 등)는 서버가 페이지에서 미리보기 이미지를 읽어옴 */
-  var url = soop || yt;
-  if(!url){ if(manual) st.textContent='먼저 숲이나 유튜브 주소를 입력해 주세요'; return; }
-  if(manual) st.textContent='썸네일 가져오는 중…';
-  try{
-    var r=await fetch(API+'/ogimage?url='+encodeURIComponent(url),{headers:DB.headers(false)});
-    var j={};
-    try{ j=await r.json(); }catch(_){}
-    if(!r.ok){
-      console.warn('[ogimage]', r.status, j);
-      if(manual) st.textContent='실패: '+(j.error||('HTTP '+r.status));
-      else toast('썸네일을 못 가져왔어요 — 직접 올려주세요');
-      return;
-    }
-    apply(j.image);
-  }catch(e){
-    console.error(e);
-    if(manual) st.textContent='실패: '+(e.message||'네트워크 오류');
-  }
+  return '';
+}
+function shortUrl(u){
+  var s=String(u).replace(/^https?:\/\//i,'').replace(/^www\./i,'').replace(/\/$/,'');
+  return s.length>44 ? s.slice(0,42)+'…' : s;
 }
 
-/* 주소 입력이 끝나면 잠시 후 썸네일 자동으로 가져오기 */
+function renderUrlChips(){
+  document.getElementById('bUrlChips').innerHTML = PLATFORMS.map(function(p){
+    var u=URLS[p.field]; if(!u) return '';
+    return '<span class="urlchip '+esc(p.key)+'" title="'+esc(u)+'">'+
+      pfIcon(p,'pf')+'<b>'+esc(p.label)+'</b>'+
+      '<span class="u">'+esc(shortUrl(u))+'</span>'+
+      '<button type="button" aria-label="'+esc(p.label)+' 주소 지우기" '+
+      'onclick="removeUrl(\''+esc(p.field)+'\')">×</button></span>';
+  }).join('');
+}
+
+function addUrl(v){
+  var st=document.getElementById('bStat');
+  var u=normUrl(v); if(!u) return;
+  var f=detectField(u);
+  if(!f){
+    st.textContent='알 수 없는 주소예요 — 숲 또는 유튜브 영상 주소를 넣어주세요';
+    return;
+  }
+  st.textContent='';
+  var p=pfByField(f), had=!!URLS[f];
+  if(had && URLS[f]===u){ toast(p.label+' 주소는 이미 들어가 있어요'); return; }
+  URLS[f]=u;
+  renderUrlChips();
+  toast(had ? (p.label+' 주소를 바꿨어요') : (p.label+' 주소를 넣었어요'));
+  refreshThumbs(false);
+}
+
+function removeUrl(f){
+  if(!URLS[f]) return;
+  delete URLS[f];
+  renderUrlChips();
+  CAND = CAND.filter(function(c){ return c.field!==f; });
+  renderThumbPick();
+  if(!aliveHas(bUrl)) selectFirstAlive();
+}
+
 (function(){
-  var timer=null;
-  ['bSoop','bYt'].forEach(function(id){
-    var el=document.getElementById(id);
-    el.addEventListener('input',function(){
-      clearTimeout(timer);
-      var v=el.value.trim();
-      if(!v || bUrl) return;
-      if(!/^https?:\/\//i.test(v)) return;
-      timer=setTimeout(function(){ fetchThumb(false); }, 700);
-    });
+  var el=document.getElementById('bUrlInput');
+  el.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){ e.preventDefault(); addUrl(el.value); el.value=''; }
+    else if(e.key==='Backspace' && !el.value){
+      for(var i=PLATFORMS.length-1;i>=0;i--){
+        if(URLS[PLATFORMS[i].field]){ removeUrl(PLATFORMS[i].field); break; }
+      }
+    }
+  });
+  el.addEventListener('blur',function(){
+    if(el.value.trim()){ addUrl(el.value); el.value=''; }
   });
 })();
 
+/* ═════════ 썸네일 후보 고르기 ═════════ */
+/* CAND 항목: { src, field, label, icon, note, dead } */
+var CAND=[];
+
+function ytId(url){
+  var m=String(url||'').match(
+    /(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:watch\?v=|live\/|embed\/|v\/|shorts\/))([A-Za-z0-9_-]{11})/);
+  return m?m[1]:'';
+}
+
+function addCand(c){
+  if(!c.src) return;
+  for(var i=0;i<CAND.length;i++) if(CAND[i].src===c.src) return;
+  CAND.push(c);
+}
+function aliveHas(src){
+  if(!src) return false;
+  for(var i=0;i<CAND.length;i++) if(CAND[i].src===src && !CAND[i].dead) return true;
+  return false;
+}
+
+function renderThumbPick(){
+  var box=document.getElementById('bThumbs');
+  box.innerHTML = CAND.map(function(c,i){
+    var p = c.icon
+      ? (/\.(png|jpg|jpeg|svg|webp|gif)$/i.test(c.icon)
+          ? '<img src="'+esc(c.icon)+'" alt="">' : '<span>'+esc(c.icon)+'</span>')
+      : '';
+    return '<button type="button" class="tcard'+(c.src===bUrl?' on':'')+'"'+
+      (c.dead?' style="display:none"':'')+' data-i="'+i+'" title="'+esc(c.src)+'">'+
+      '<span class="ck">✓</span>'+
+      '<img src="'+esc(c.src)+'" alt="" '+
+        'onload="thumbLoaded(this)" onerror="thumbFailed(this)">'+
+      '<span class="src">'+p+'<span>'+esc(c.label)+(c.note?' · '+esc(c.note):'')+'</span></span>'+
+      '</button>';
+  }).join('');
+  Array.prototype.forEach.call(box.querySelectorAll('.tcard'),function(el){
+    el.addEventListener('click',function(){ pickThumb(+el.getAttribute('data-i')); });
+  });
+  updateThumbHint();
+}
+
+function cardOf(img){
+  var el=img.parentNode;
+  while(el && (!el.classList || !el.classList.contains('tcard'))) el=el.parentNode;
+  return el;
+}
+/* 유튜브는 없는 화질을 요청하면 120×90 회색 이미지를 주기도 해서 걸러냅니다 */
+function thumbLoaded(img){
+  if(img.naturalWidth<=120 && img.naturalHeight<=90) thumbFailed(img);
+}
+function thumbFailed(img){
+  var card=cardOf(img); if(!card) return;
+  var i=+card.getAttribute('data-i');
+  if(CAND[i]) CAND[i].dead=true;
+  card.style.display='none';
+  card.classList.remove('on');
+  if(CAND[i] && CAND[i].src===bUrl){ bUrl=''; selectFirstAlive(); }
+  updateThumbHint();
+}
+
+function pickThumb(i){
+  var c=CAND[i]; if(!c || c.dead) return;
+  bUrl=c.src;
+  markSelection();
+  document.getElementById('bStat').textContent='';
+}
+function selectFirstAlive(){
+  for(var i=0;i<CAND.length;i++) if(!CAND[i].dead){ pickThumb(i); return; }
+  bUrl=''; markSelection();
+}
+function markSelection(){
+  Array.prototype.forEach.call(
+    document.getElementById('bThumbs').querySelectorAll('.tcard'),function(el){
+      var c=CAND[+el.getAttribute('data-i')];
+      el.classList.toggle('on', !!c && c.src===bUrl);
+    });
+}
+function updateThumbHint(){
+  var alive=0, i;
+  for(i=0;i<CAND.length;i++) if(!CAND[i].dead) alive++;
+  var hint=document.getElementById('bThumbHint');
+  if(alive){ hint.style.display='none'; return; }
+  hint.style.display='block';
+  hint.textContent = Object.keys(URLS).length
+    ? '가져온 썸네일이 없어요 — 직접 올려주세요'
+    : '주소를 넣으면 썸네일 후보가 여기 뜹니다. 하나를 골라주세요.';
+}
+
+/* 플랫폼별로 방식이 달라서 따로 처리합니다.
+   · 유튜브 → 주소에서 영상 ID를 뽑아 화질별로 바로 (서버 요청 없음)
+   · 숲 등  → 서버(/api/ogimage)가 페이지의 미리보기 이미지를 읽어옴 */
+async function fetchOg(url, p){
+  try{
+    var r=await fetch(API+'/ogimage?url='+encodeURIComponent(url),{headers:DB.headers(false)});
+    var j={}; try{ j=await r.json(); }catch(_){}
+    if(!r.ok || !j.image){
+      console.warn('[ogimage]', p.field, r.status, j);
+      return { ok:false, label:p.label, msg:(j.error||('HTTP '+r.status)) };
+    }
+    addCand({ src:j.image, field:p.field, label:p.label, icon:p.icon, note:'미리보기' });
+    return { ok:true };
+  }catch(e){
+    console.error(e);
+    return { ok:false, label:p.label, msg:(e.message||'네트워크 오류') };
+  }
+}
+
+async function refreshThumbs(manual){
+  var st=document.getElementById('bStat');
+  var fields=Object.keys(URLS);
+
+  if(!fields.length){
+    if(manual) st.textContent='먼저 영상 주소를 입력해 주세요';
+    CAND=CAND.filter(function(c){ return c.field==='upload'||c.field==='saved'; });
+    renderThumbPick();
+    if(!aliveHas(bUrl)) selectFirstAlive();
+    return;
+  }
+  if(manual) st.textContent='썸네일 가져오는 중…';
+
+  /* 직접 올린 사진과 기존 썸네일은 남기고, 주소에서 온 후보만 다시 만듭니다 */
+  CAND=CAND.filter(function(c){ return c.field==='upload'||c.field==='saved'; });
+
+  var jobs=[];
+  PLATFORMS.forEach(function(p){
+    var u=URLS[p.field]; if(!u) return;
+    var id=ytId(u);
+    if(id){
+      [['maxresdefault','고화질'],['sddefault','중간'],['hqdefault','기본']].forEach(function(q){
+        addCand({ src:'https://img.youtube.com/vi/'+id+'/'+q[0]+'.jpg',
+                  field:p.field, label:p.label, icon:p.icon, note:q[1] });
+      });
+    }else{
+      jobs.push(fetchOg(u,p));
+    }
+  });
+
+  renderThumbPick();
+  if(!aliveHas(bUrl)) selectFirstAlive();
+
+  if(!jobs.length){ if(manual) st.textContent=''; return; }
+
+  var res=await Promise.all(jobs);
+  renderThumbPick();
+  if(!aliveHas(bUrl)) selectFirstAlive();
+
+  var fails=res.filter(function(x){ return x && !x.ok; });
+  if(manual){
+    st.textContent = fails.length
+      ? fails.map(function(f){ return f.label+' 실패: '+f.msg; }).join(' / ')
+      : '';
+    if(!fails.length) toast('썸네일 후보를 가져왔어요');
+  }else if(fails.length && !aliveHas(bUrl)){
+    toast('썸네일을 못 가져왔어요 — 직접 올려주세요');
+  }
+}
+
+/* 직접 올린 사진도 후보 목록에 넣고 바로 선택 */
+bindDrop(document.getElementById('bDrop'), document.getElementById('bFile'), function(url){
+  addCand({ src:url, field:'upload', label:'직접 올린 사진', icon:'🖼', note:'' });
+  renderThumbPick();
+  for(var i=0;i<CAND.length;i++) if(CAND[i].src===url){ pickThumb(i); break; }
+});
+
 function cancelBroadcast(){
   bEditId=null; bUrl='';
-  ['bTitle','bTagInput','bSoop','bYt'].forEach(function(id){ document.getElementById(id).value=''; });
+  ['bTitle','bTagInput','bUrlInput'].forEach(function(id){ document.getElementById(id).value=''; });
   TAGS=[]; renderChips();
-  document.getElementById('bPrev').style.display='none';
+  URLS={}; renderUrlChips();
+  CAND=[]; renderThumbPick();
   document.getElementById('bHead').textContent='방송 히스토리 등록';
   document.getElementById('bSubmit').textContent='등록하기';
   document.getElementById('bCancel').style.display='none';
@@ -523,10 +786,20 @@ function editBroadcast(id){
   document.getElementById('bTitle').value=b.title||'';
   document.getElementById('bDate').value=(b.broadcast_date||'').slice(0,16);
   TAGS=String(b.tags||'').split(',').map(function(x){return x.trim();}).filter(Boolean); renderChips();
-  document.getElementById('bSoop').value=b.soop_url||'';
-  document.getElementById('bYt').value=b.youtube_url||'';
-  if(bUrl){ document.getElementById('bPrevImg').src=bUrl;
-            document.getElementById('bPrev').style.display='block'; }
+  document.getElementById('bUrlInput').value='';
+
+  URLS={};
+  PLATFORMS.forEach(function(p){
+    var v=String(b[p.field]||'').trim();
+    if(v) URLS[p.field]=v;
+  });
+  renderUrlChips();
+
+  CAND=[];
+  if(bUrl) addCand({ src:bUrl, field:'saved', label:'지금 쓰는 썸네일', icon:'⭐', note:'' });
+  renderThumbPick();
+  refreshThumbs(false);
+
   document.getElementById('bHead').textContent='방송 히스토리 수정';
   document.getElementById('bSubmit').textContent='수정 완료';
   document.getElementById('bCancel').style.display='inline-block';
@@ -542,10 +815,10 @@ async function saveBroadcast(){
     title:t,
     broadcast_date:document.getElementById('bDate').value||'',
     tags:TAGS.join(', '),
-    soop_url:document.getElementById('bSoop').value.trim(),
-    youtube_url:document.getElementById('bYt').value.trim(),
+    soop_url:'', youtube_url:'',
     thumbnail_url:bUrl, sort_order:0
   };
+  PLATFORMS.forEach(function(p){ row[p.field]=URLS[p.field]||''; });
   try{
     if(bEditId){
       var cur=BC.filter(function(x){return x.id===bEditId;})[0];
