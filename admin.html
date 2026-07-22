@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="style.css">
+<style>
+.ahead{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:18px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.ahead h1{font-family:var(--disp);font-weight:400;font-size:24px;color:var(--ink)}
+.ahead .out{border:none;background:var(--pink-soft);color:var(--pink-deep);
+  padding:8px 16px;border-radius:20px;font-family:var(--body);font-size:13px;cursor:pointer}
+.tabs{display:flex;gap:8px;margin:22px 0}
+.tabs button{border:1.5px solid var(--line);background:var(--card);color:var(--sub);
+  padding:9px 20px;border-radius:22px;font-family:var(--body);font-size:14px;cursor:pointer;transition:.15s}
+.tabs button.on{background:var(--pink);border-color:var(--pink);color:#fff}
+.panel{display:none}.panel.on{display:block}
+
+.box{background:var(--card);border-radius:18px;padding:22px;box-shadow:var(--shadow);margin-bottom:18px}
+.box h3{font-family:var(--disp);font-weight:400;font-size:18px;margin-bottom:14px;color:var(--ink)}
+.frow{display:grid;grid-template-columns:110px 1fr;gap:10px;align-items:center;margin-bottom:10px}
+.frow label{font-size:14px;color:var(--sub)}
+.frow input,.frow textarea{width:100%;border:1.5px solid var(--line);border-radius:12px;
+  padding:10px 13px;font-family:var(--body);font-size:14px;background:var(--page);
+  color:var(--ink);outline:none;resize:vertical}
+.frow input:focus,.frow textarea:focus{border-color:var(--pink)}
+.btn{border:none;background:var(--pink);color:#fff;padding:11px 24px;border-radius:14px;
+  font-family:var(--body);font-size:14px;cursor:pointer}
+.btn:hover{background:var(--pink-deep)}
+.btn.ghost{background:var(--pink-soft);color:var(--pink-deep)}
+.btn.del{background:transparent;color:#c46;border:1.5px solid var(--line);padding:6px 12px;font-size:12.5px}
+.btn.del:hover{background:#fee;border-color:#c46}
+.hint{font-size:12.5px;color:var(--sub);margin-top:4px}
+.stat{font-size:13px;color:var(--pink-deep);min-height:18px;margin-top:8px}
+
+.drop{border:2px dashed var(--line);border-radius:16px;padding:34px 20px;text-align:center;
+  color:var(--sub);cursor:pointer;transition:.2s;background:var(--page)}
+.drop:hover,.drop.over{border-color:var(--pink);background:var(--pink-soft);color:var(--pink-deep)}
+.drop .big{font-size:32px;display:block;margin-bottom:6px}
+.preview{margin-top:12px;display:none}
+.preview img{max-width:180px;max-height:220px;border-radius:12px;display:block}
+
+.list{display:flex;flex-direction:column;gap:10px}
+.item{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;
+  display:flex;gap:14px;align-items:flex-start}
+.item .thumb64{width:56px;height:70px;border-radius:10px;object-fit:cover;flex-shrink:0;background:var(--pink-soft)}
+.item .body{flex:1;min-width:0}
+.item .t{font-size:15px;color:var(--ink);margin-bottom:3px}
+.item .m{font-size:12.5px;color:var(--sub);font-family:var(--latin)}
+.item .msg{font-size:14px;color:var(--ink);margin-top:6px;white-space:pre-wrap;word-break:break-word}
+.item .tag{display:inline-block;background:var(--pink-soft);color:var(--pink-deep);
+  font-size:11.5px;padding:2px 9px;border-radius:20px;margin-right:5px}
+.empty2{text-align:center;color:var(--sub);padding:40px 0;font-size:14px}
+
+.login{max-width:360px;margin:80px auto;background:var(--card);border-radius:22px;
+  padding:34px 30px;box-shadow:var(--shadow);text-align:center}
+.login h2{font-family:var(--disp);font-weight:400;font-size:22px;margin-bottom:6px}
+.login p{font-size:13.5px;color:var(--sub);margin-bottom:18px}
+.login input{width:100%;border:1.5px solid var(--line);border-radius:14px;padding:12px 14px;
+  font-family:var(--body);font-size:14px;background:var(--page);color:var(--ink);
+  outline:none;margin-bottom:12px;text-align:center}
+.login input:focus{border-color:var(--pink)}
+@media(max-width:640px){ .frow{grid-template-columns:1fr;gap:4px} }
+</style>
+</head>
+<body>
+
+<div id="sky"></div>
+
+<div class="wrap">
+  <!-- 로그인 -->
+  <div class="login" id="login">
+    <h2>🔒 관리자</h2>
+    <p>관리자 토큰을 입력해 주세요</p>
+    <input id="tok" type="password" placeholder="ADMIN_TOKEN" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn" style="width:100%" onclick="doLogin()">들어가기</button>
+    <div class="stat" id="loginStat"></div>
+  </div>
+
+  <!-- 관리 화면 -->
+  <div id="app" style="display:none">
+    <div class="ahead">
+      <h1 id="adminTitle">관리자</h1>
+      <button class="out" onclick="doLogout()">로그아웃</button>
+    </div>
+
+    <div class="tabs">
+      <button class="on" data-t="gallery" onclick="tab('gallery')">🖼 화보</button>
+      <button data-t="broadcast" onclick="tab('broadcast')">🎬 방송</button>
+      <button data-t="inquiry" onclick="tab('inquiry')">💌 문의</button>
+    </div>
+
+    <!-- 화보 -->
+    <div class="panel on" id="p-gallery">
+      <div class="box">
+        <h3>화보 올리기</h3>
+        <div class="drop" id="drop">
+          <span class="big">📷</span>
+          사진을 끌어다 놓거나 클릭해서 선택
+          <div class="hint">JPG · PNG · WEBP</div>
+        </div>
+        <input type="file" id="file" accept="image/*" style="display:none">
+        <div class="preview" id="prev"><img id="prevImg" src="" alt=""></div>
+        <div style="margin-top:14px">
+          <div class="frow"><label>제목</label><input id="gTitle" placeholder="8월 여름 수영복"></div>
+          <div class="frow"><label>설명</label><textarea id="gDesc" rows="2" placeholder="바다 가고 싶어서 골라본 코디 🌊"></textarea></div>
+          <div class="frow"><label>순서</label><input id="gOrder" type="number" value="0"></div>
+        </div>
+        <button class="btn" onclick="saveGallery()">등록하기</button>
+        <div class="stat" id="gStat"></div>
+      </div>
+      <div class="list" id="gList"></div>
+    </div>
+
+    <!-- 방송 -->
+    <div class="panel" id="p-broadcast">
+      <div class="box">
+        <h3>방송 등록</h3>
+        <div class="frow"><label>제목</label><input id="bTitle" placeholder="파스모포비아 공포게임"></div>
+        <div class="frow"><label>방송일</label><input id="bDate" type="datetime-local"></div>
+        <div class="frow"><label>태그</label><input id="bTags" placeholder="공포, 종겜  (쉼표로 구분)"></div>
+        <div class="frow"><label>숲 주소</label><input id="bSoop" placeholder="비워두면 '준비 중'으로 표시"></div>
+        <div class="frow"><label>유튜브 주소</label><input id="bYt" placeholder="비워두면 '준비 중'으로 표시"></div>
+        <div class="frow"><label>썸네일</label><input id="bThumb" placeholder="비우면 유튜브 썸네일 자동"></div>
+        <button class="btn" onclick="saveBroadcast()">등록하기</button>
+        <div class="stat" id="bStat"></div>
+      </div>
+      <div class="list" id="bList"></div>
+    </div>
+
+    <!-- 문의 -->
+    <div class="panel" id="p-inquiry">
+      <div class="list" id="iList"></div>
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script>
+applyTheme();
+initSparkles();
+document.getElementById('adminTitle').textContent = fullName()+' 관리자';
+
+/* ───── 로그인 ───── */
+async function doLogin(){
+  var t=document.getElementById('tok').value.trim();
+  var s=document.getElementById('loginStat');
+  if(!t){ s.textContent='토큰을 입력해 주세요'; return; }
+  s.textContent='확인 중…';
+  try{
+    localStorage.setItem('adminToken', t);
+    var r=await fetch(API+'/auth',{method:'POST',headers:{'X-Admin-Token':t}});
+    if(!r.ok) throw new Error();
+    enterApp();
+  }catch(e){
+    localStorage.removeItem('adminToken');
+    s.textContent='토큰이 맞지 않아요';
+  }
+}
+function doLogout(){
+  localStorage.removeItem('adminToken');
+  location.reload();
+}
+function enterApp(){
+  document.getElementById('login').style.display='none';
+  document.getElementById('app').style.display='block';
+  loadGallery(); loadBroadcast(); loadInquiry();
+}
+(function(){ if(DB.token()) { fetch(API+'/auth',{method:'POST',headers:{'X-Admin-Token':DB.token()}})
+  .then(function(r){ if(r.ok) enterApp(); }); } })();
+
+/* ───── 탭 ───── */
+function tab(n){
+  document.querySelectorAll('.tabs button').forEach(function(b){ b.classList.toggle('on', b.dataset.t===n); });
+  document.querySelectorAll('.panel').forEach(function(p){ p.classList.toggle('on', p.id==='p-'+n); });
+}
+
+/* ───── 화보 ───── */
+var uploadedUrl='';
+var drop=document.getElementById('drop'), fileEl=document.getElementById('file');
+drop.addEventListener('click',function(){ fileEl.click(); });
+drop.addEventListener('dragover',function(e){ e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave',function(){ drop.classList.remove('over'); });
+drop.addEventListener('drop',function(e){
+  e.preventDefault(); drop.classList.remove('over');
+  if(e.dataTransfer.files[0]) upload(e.dataTransfer.files[0]);
+});
+fileEl.addEventListener('change',function(){ if(fileEl.files[0]) upload(fileEl.files[0]); });
+
+async function upload(f){
+  var s=document.getElementById('gStat');
+  s.textContent='업로드 중…';
+  try{
+    var res=await DB.upload(f);
+    uploadedUrl=res.url;
+    document.getElementById('prevImg').src=res.url;
+    document.getElementById('prev').style.display='block';
+    s.textContent='사진 준비 완료! 제목 적고 등록하세요';
+  }catch(e){ s.textContent='업로드 실패 ㅠㅠ'; }
+}
+
+async function saveGallery(){
+  var s=document.getElementById('gStat');
+  if(!uploadedUrl){ s.textContent='먼저 사진을 올려주세요'; return; }
+  var t=document.getElementById('gTitle').value.trim();
+  if(!t){ s.textContent='제목을 입력해 주세요'; return; }
+  s.textContent='저장 중…';
+  try{
+    await DB.insert('gallery',{
+      title:t,
+      description:document.getElementById('gDesc').value.trim(),
+      image_url:uploadedUrl,
+      sort_order:parseInt(document.getElementById('gOrder').value||'0',10)
+    });
+    s.textContent='등록됐어요! 🎉';
+    uploadedUrl='';
+    document.getElementById('gTitle').value='';
+    document.getElementById('gDesc').value='';
+    document.getElementById('prev').style.display='none';
+    loadGallery();
+  }catch(e){ s.textContent='저장 실패 ㅠㅠ'; }
+}
+
+async function loadGallery(){
+  var box=document.getElementById('gList');
+  try{
+    var rows=await DB.list('gallery');
+    if(!rows.length){ box.innerHTML='<div class="empty2">등록된 화보가 없어요</div>'; return; }
+    box.innerHTML=rows.map(function(g){
+      return '<div class="item">'+
+        (g.image_url?'<img class="thumb64" src="'+esc(g.image_url)+'" alt="">':'<div class="thumb64"></div>')+
+        '<div class="body"><div class="t">'+esc(g.title)+'</div>'+
+        '<div class="m">순서 '+(g.sort_order||0)+'</div>'+
+        (g.description?'<div class="msg">'+esc(g.description)+'</div>':'')+'</div>'+
+        '<button class="btn del" onclick="delItem(\'gallery\','+g.id+')">삭제</button></div>';
+    }).join('');
+  }catch(e){ box.innerHTML='<div class="empty2">불러오기 실패</div>'; }
+}
+
+/* ───── 방송 ───── */
+async function saveBroadcast(){
+  var s=document.getElementById('bStat');
+  var t=document.getElementById('bTitle').value.trim();
+  if(!t){ s.textContent='제목을 입력해 주세요'; return; }
+  s.textContent='저장 중…';
+  try{
+    await DB.insert('broadcasts',{
+      title:t,
+      broadcast_date:document.getElementById('bDate').value||'',
+      tags:document.getElementById('bTags').value.trim(),
+      soop_url:document.getElementById('bSoop').value.trim(),
+      youtube_url:document.getElementById('bYt').value.trim(),
+      thumbnail_url:document.getElementById('bThumb').value.trim()
+    });
+    s.textContent='등록됐어요! 🎉';
+    ['bTitle','bDate','bTags','bSoop','bYt','bThumb'].forEach(function(id){
+      document.getElementById(id).value='';
+    });
+    loadBroadcast();
+  }catch(e){ s.textContent='저장 실패 ㅠㅠ'; }
+}
+
+async function loadBroadcast(){
+  var box=document.getElementById('bList');
+  try{
+    var rows=await DB.list('broadcasts');
+    if(!rows.length){ box.innerHTML='<div class="empty2">등록된 방송이 없어요</div>'; return; }
+    box.innerHTML=rows.map(function(b){
+      var tags=String(b.tags||'').split(',').map(function(x){return x.trim();}).filter(Boolean)
+        .map(function(x){return '<span class="tag">#'+esc(x)+'</span>';}).join('');
+      return '<div class="item"><div class="body">'+
+        '<div class="t">'+esc(b.title)+'</div>'+
+        '<div class="m">'+esc(String(b.broadcast_date||'').replace('T',' '))+'</div>'+
+        (tags?'<div style="margin-top:6px">'+tags+'</div>':'')+
+        '</div><button class="btn del" onclick="delItem(\'broadcasts\','+b.id+')">삭제</button></div>';
+    }).join('');
+  }catch(e){ box.innerHTML='<div class="empty2">불러오기 실패</div>'; }
+}
+
+/* ───── 문의 ───── */
+async function loadInquiry(){
+  var box=document.getElementById('iList');
+  try{
+    var rows=await DB.list('inquiries');
+    if(!rows.length){ box.innerHTML='<div class="empty2">받은 문의가 없어요</div>'; return; }
+    box.innerHTML=rows.map(function(q){
+      var mail=q.contact?('<a href="mailto:'+esc(q.contact)+'" style="color:var(--pink-deep)">'+esc(q.contact)+'</a>'):'<span style="color:var(--sub)">연락처 없음</span>';
+      return '<div class="item"><div class="body">'+
+        '<div class="t">'+esc(q.nickname)+'</div>'+
+        '<div class="m">'+esc(String(q.created_at||'').slice(0,16))+' · '+mail+'</div>'+
+        '<div class="msg">'+esc(q.message)+'</div>'+
+        '</div><button class="btn del" onclick="delItem(\'inquiries\','+q.id+')">삭제</button></div>';
+    }).join('');
+  }catch(e){ box.innerHTML='<div class="empty2">불러오기 실패</div>'; }
+}
+
+/* ───── 삭제 ───── */
+async function delItem(table,id){
+  if(!confirm('정말 삭제할까요?')) return;
+  try{
+    await DB.remove(table,id);
+    if(table==='gallery') loadGallery();
+    else if(table==='broadcasts') loadBroadcast();
+    else loadInquiry();
+  }catch(e){ alert('삭제 실패'); }
+}
+</script>
+</body>
+</html>
