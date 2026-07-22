@@ -46,8 +46,8 @@
   /* ── 삭제 (빨강) ── */
   --a-danger      : #f04452;
   --a-danger-ink  : #d9364a;
-  --a-danger-soft : #ffeff0;
-  --a-danger-soft2: #ffdfe2;
+  --a-danger-line : #f9c9ce;   /* 삭제 버튼 테두리 */
+  --a-danger-soft : #ffeff0;   /* 삭제 버튼 호버 면 */
 
   /* ── 공통 형태 ── */
   --a-radius   : 10px;
@@ -61,6 +61,9 @@
 }
 
 /* ───── 기본 ───── */
+/* 탭마다 내용 길이가 달라 스크롤바가 생겼다 없어졌다 하면
+   그때마다 본문 폭이 흔들립니다. 자리를 미리 잡아둡니다. */
+html{scrollbar-gutter:stable}
 body{
   background:var(--a-bg);
   font-family:var(--a-font);
@@ -71,7 +74,7 @@ body{
 }
 #sky{display:none}
 button,input,textarea{font-family:var(--a-font);letter-spacing:-.02em}
-::placeholder{color:var(--a-faint)}
+::placeholder{color:var(--g500)}
 ::selection{background:var(--a-primary-soft);color:var(--a-primary-ink)}
 
 /* ───── 상단 ───── */
@@ -97,7 +100,7 @@ button,input,textarea{font-family:var(--a-font);letter-spacing:-.02em}
    1) 주요 .btn        진한 파랑 채움 — 등록하기 · 수정 완료
    2) 서브 .btn.sub    옅은 파랑 면   — 취소 · 다시 가져오기 · 목록의 수정
    3) 기타 .btn.ghost  회색 면        — 로그아웃 등 중립 동작
-   4) 삭제 .btn.del    옅은 빨강 면   — 서브와 같은 형태, 색만 다르게
+   4) 삭제 .btn.del    흰 면 + 붉은 선 — 유일하게 채우지 않은 버튼
 
    수정과 삭제는 같은 줄에 붙어 있어서 형태를 맞추고 색으로만
    구분합니다. 파랑과 빨강은 색상이 멀어 작은 글씨에서도 갈립니다. */
@@ -115,12 +118,13 @@ button,input,textarea{font-family:var(--a-font);letter-spacing:-.02em}
   cursor:pointer;transition:.15s;font-family:var(--a-font);letter-spacing:-.02em}
 .btn.ghost:hover,.ahead .out:hover{background:var(--g200);color:var(--a-body)}
 
-.btn.edit,.btn.del{width:100%;padding:8px 0;font-size:12.5px;border:none;
+.btn.edit,.btn.del{width:100%;padding:8px 0;font-size:12.5px;border:1px solid transparent;
   border-radius:8px;text-align:center;font-weight:600;cursor:pointer;transition:.15s}
 .btn.edit{background:var(--a-primary-soft);color:var(--a-primary-ink)}
 .btn.edit:hover{background:var(--a-primary-soft2)}
-.btn.del{background:var(--a-danger-soft);color:var(--a-danger-ink)}
-.btn.del:hover{background:var(--a-danger-soft2)}
+.btn.del{background:var(--a-surface);color:var(--a-danger-ink);
+  border-color:var(--a-danger-line)}
+.btn.del:hover{background:var(--a-danger-soft);border-color:var(--a-danger)}
 
 /* ───── 카드(영역) ───── */
 .box{background:var(--a-surface);border-radius:var(--a-radius-lg);padding:26px 26px 22px;
@@ -137,13 +141,15 @@ button,input,textarea{font-family:var(--a-font);letter-spacing:-.02em}
 .frow.ftop{align-items:flex-start}
 .frow.ftop label{padding-top:12px}
 .frow label{font-size:14px;color:var(--a-sub);font-weight:600}
-.frow input,.frow textarea{width:100%;border:1px solid transparent;
-  border-radius:var(--a-radius);padding:12px 14px;font-size:14px;
-  background:var(--g100);color:var(--a-ink);outline:none;resize:vertical;
-  transition:background .15s, border-color .15s, box-shadow .15s}
-.frow input:hover,.frow textarea:hover{background:var(--g200)}
-.frow input:focus,.frow textarea:focus{background:var(--a-surface);
-  border-color:var(--a-primary);box-shadow:var(--a-focus)}
+.frow input,.frow textarea{width:100%;border:1px solid var(--a-line);
+  border-radius:var(--a-radius);padding:11px 14px;font-size:14px;
+  background:var(--a-surface);color:var(--a-ink);outline:none;resize:vertical;
+  transition:border-color .15s, box-shadow .15s}
+.frow input:hover,.frow textarea:hover{border-color:var(--a-line-strong)}
+.frow input:focus,.frow textarea:focus{border-color:var(--a-primary);box-shadow:var(--a-focus)}
+/* 진짜 비활성일 때만 회색으로 채웁니다 */
+.frow input:disabled,.frow textarea:disabled{background:var(--g100);
+  border-color:var(--a-line);color:var(--a-faint);cursor:not-allowed}
 .actions{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:24px}
 .hint{font-size:12.5px;color:var(--a-faint);margin-top:6px}
 .stat{font-size:13px;color:var(--a-primary-ink);font-weight:500;min-height:18px}
@@ -244,9 +250,10 @@ button,input,textarea{font-family:var(--a-font);letter-spacing:-.02em}
 
 /* ───── 검색 ───── */
 .isearch{position:relative;margin-bottom:14px}
-.isearch input{width:100%;border:1px solid transparent;border-radius:var(--a-radius);
-  background:var(--a-surface);padding:12px 14px 12px 40px;font-size:14px;
-  color:var(--a-ink);outline:none;transition:.15s;box-shadow:var(--a-shadow)}
+.isearch input{width:100%;border:1px solid var(--a-line);border-radius:var(--a-radius);
+  background:var(--a-surface);padding:11px 14px 11px 40px;font-size:14px;
+  color:var(--a-ink);outline:none;transition:.15s}
+.isearch input:hover{border-color:var(--a-line-strong)}
 .isearch input:focus{border-color:var(--a-primary);box-shadow:var(--a-focus)}
 .isearch .si{position:absolute;left:15px;top:50%;transform:translateY(-50%);
   color:var(--a-faint);font-size:14px;pointer-events:none}
@@ -264,11 +271,11 @@ mark{background:#fff3c4;color:var(--a-ink);border-radius:3px;padding:0 2px}
 .login h2{font-size:20px;font-weight:700;color:var(--a-ink);
   margin-bottom:6px;letter-spacing:-.03em}
 .login p{font-size:13.5px;color:var(--a-sub);margin-bottom:20px}
-.login input{width:100%;border:1px solid transparent;border-radius:var(--a-radius);
-  padding:13px 14px;font-size:14px;background:var(--g100);color:var(--a-ink);
+.login input{width:100%;border:1px solid var(--a-line);border-radius:var(--a-radius);
+  padding:12px 14px;font-size:14px;background:var(--a-surface);color:var(--a-ink);
   outline:none;margin-bottom:12px;text-align:center;transition:.15s}
-.login input:focus{background:var(--a-surface);
-  border-color:var(--a-primary);box-shadow:var(--a-focus)}
+.login input:hover{border-color:var(--a-line-strong)}
+.login input:focus{border-color:var(--a-primary);box-shadow:var(--a-focus)}
 
 /* ───── 반응형 · 접근성 ───── */
 @media(max-width:640px){ .frow{grid-template-columns:1fr;gap:4px} .frow.ftop label{padding-top:0} }
