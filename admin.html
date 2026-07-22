@@ -454,48 +454,22 @@ async function fetchThumb(){
         ||(document.getElementById('bYt').value||'').trim();
   var st=document.getElementById('bStat');
   if(!url){ st.textContent='먼저 숲이나 유튜브 주소를 입력해 주세요'; return; }
-  toast('썸네일 가져오는 중…');
+  st.textContent='썸네일 가져오는 중…';
   try{
     var r=await fetch(API+'/ogimage?url='+encodeURIComponent(url),{headers:DB.headers(false)});
-    if(!r.ok) throw new Error();
-    var j=await r.json();
+    var j={};
+    try{ j=await r.json(); }catch(_){}
+    if(!r.ok){
+      st.textContent='실패: '+(j.error||('HTTP '+r.status));
+      console.warn('[ogimage]', r.status, j);
+      return;
+    }
     bUrl=j.image;
     document.getElementById('bPrevImg').src=j.image;
     document.getElementById('bPrev').style.display='block';
     st.textContent='';
     toast('썸네일을 가져왔어요');
-  }catch(e){ toast('가져오지 못했어요 — 직접 올려주세요'); }
-}
-
-
-function cancelBroadcast(){
-  bEditId=null; bUrl='';
-  ['bTitle','bTagInput','bSoop','bYt'].forEach(function(id){ document.getElementById(id).value=''; });
-  TAGS=[]; renderChips();
-  document.getElementById('bPrev').style.display='none';
-  document.getElementById('bHead').textContent='방송 히스토리 등록';
-  document.getElementById('bSubmit').textContent='등록하기';
-  document.getElementById('bCancel').style.display='none';
-  document.getElementById('bStat').textContent='';
-  setToday();
-  loadBroadcast();
-}
-
-function editBroadcast(id){
-  var b=BC.filter(function(x){return x.id===id;})[0]; if(!b) return;
-  bEditId=id; bUrl=b.thumbnail_url||'';
-  document.getElementById('bTitle').value=b.title||'';
-  document.getElementById('bDate').value=(b.broadcast_date||'').slice(0,16);
-  TAGS=String(b.tags||'').split(',').map(function(x){return x.trim();}).filter(Boolean); renderChips();
-  document.getElementById('bSoop').value=b.soop_url||'';
-  document.getElementById('bYt').value=b.youtube_url||'';
-  if(bUrl){ document.getElementById('bPrevImg').src=bUrl;
-            document.getElementById('bPrev').style.display='block'; }
-  document.getElementById('bHead').textContent='방송 히스토리 수정';
-  document.getElementById('bSubmit').textContent='수정 완료';
-  document.getElementById('bCancel').style.display='inline-block';
-  loadBroadcast();
-  window.scrollTo({top:0,behavior:'smooth'});
+  }catch(e){ st.textContent='실패: '+(e.message||'네트워크 오류'); }
 }
 
 async function saveBroadcast(){
