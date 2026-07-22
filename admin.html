@@ -351,7 +351,7 @@ async function saveGallery(){
     }
     cancelGallery();
     loadGallery();
-  }catch(e){ s.textContent='저장 실패 ㅠㅠ'; }
+  }catch(e){ s.textContent='저장 실패: '+(e.message||'알 수 없는 오류'); console.error(e); }
 }
 
 var GAL=[];
@@ -410,7 +410,7 @@ async function saveGalleryOrder(){
     }
     toast('순서가 바뀌었어요');
     loadGallery();
-  }catch(e){ toast('순서 저장 실패'); }
+  }catch(e){ toast('순서 저장 실패: '+(e.message||'')); console.error(e); }
 }
 
 /* ───── 방송 ───── */
@@ -472,6 +472,35 @@ async function fetchThumb(){
   }catch(e){ st.textContent='실패: '+(e.message||'네트워크 오류'); }
 }
 
+
+function cancelBroadcast(){
+  bEditId=null; bUrl='';
+  ['bTitle','bTagInput','bSoop','bYt'].forEach(function(id){ document.getElementById(id).value=''; });
+  TAGS=[]; renderChips();
+  document.getElementById('bPrev').style.display='none';
+  document.getElementById('bHead').textContent='방송 히스토리 등록';
+  document.getElementById('bSubmit').textContent='등록하기';
+  document.getElementById('bCancel').style.display='none';
+  document.getElementById('bStat').textContent='';
+  setToday();
+}
+
+function editBroadcast(id){
+  var b=BC.filter(function(x){return x.id===id;})[0]; if(!b) return;
+  bEditId=id; bUrl=b.thumbnail_url||'';
+  document.getElementById('bTitle').value=b.title||'';
+  document.getElementById('bDate').value=(b.broadcast_date||'').slice(0,16);
+  TAGS=String(b.tags||'').split(',').map(function(x){return x.trim();}).filter(Boolean); renderChips();
+  document.getElementById('bSoop').value=b.soop_url||'';
+  document.getElementById('bYt').value=b.youtube_url||'';
+  if(bUrl){ document.getElementById('bPrevImg').src=bUrl;
+            document.getElementById('bPrev').style.display='block'; }
+  document.getElementById('bHead').textContent='방송 히스토리 수정';
+  document.getElementById('bSubmit').textContent='수정 완료';
+  document.getElementById('bCancel').style.display='inline-block';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
 async function saveBroadcast(){
   var s=document.getElementById('bStat');
   var t=document.getElementById('bTitle').value.trim();
@@ -497,7 +526,7 @@ async function saveBroadcast(){
     }
     cancelBroadcast();
     loadBroadcast();
-  }catch(e){ s.textContent='저장 실패 ㅠㅠ'; }
+  }catch(e){ s.textContent='저장 실패: '+(e.message||'알 수 없는 오류'); console.error(e); }
 }
 
 /* 유튜브 자동 썸네일 */
@@ -548,7 +577,7 @@ async function saveBroadcastOrder(){
     }
     toast('순서가 바뀌었어요');
     loadBroadcast();
-  }catch(e){ toast('순서 저장 실패'); }
+  }catch(e){ toast('순서 저장 실패: '+(e.message||'')); console.error(e); }
 }
 
 /* ───── 문의 ───── */
@@ -601,7 +630,7 @@ async function toggleDone(id, val){
     await DB.update('inquiries', id, { done: val ? 1 : 0 });
     toast(val ? '처리 완료로 표시했어요' : '미처리로 되돌렸어요');
     loadInquiry();
-  }catch(e){ toast('변경 실패'); loadInquiry(); }
+  }catch(e){ toast('변경 실패: '+(e.message||'')); console.error(e); loadInquiry(); }
 }
 
 function copyText(t){
@@ -621,7 +650,7 @@ async function delItem(table,id){
     if(table==='gallery') loadGallery();
     else if(table==='broadcasts') loadBroadcast();
     else loadInquiry();
-  }catch(e){ toast('삭제 실패'); }
+  }catch(e){ toast('삭제 실패: '+(e.message||'')); console.error(e); }
 }
 </script>
 </body>
