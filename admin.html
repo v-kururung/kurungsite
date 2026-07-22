@@ -453,11 +453,26 @@ function removeTag(i){ TAGS.splice(i,1); renderChips(); }
 
 /* 숲·유튜브 주소에서 썸네일 가져오기 */
 async function fetchThumb(manual){
-  var url=(document.getElementById('bSoop').value||'').trim()
-        ||(document.getElementById('bYt').value||'').trim();
+  var soop=(document.getElementById('bSoop').value||'').trim();
+  var yt=(document.getElementById('bYt').value||'').trim();
   var st=document.getElementById('bStat');
+
+  function apply(img){
+    bUrl=img;
+    document.getElementById('bPrevImg').src=img;
+    document.getElementById('bPrev').style.display='block';
+    st.textContent='';
+    toast('썸네일을 가져왔어요');
+  }
+
+  /* 1) 유튜브는 주소에서 바로 뽑기 (서버 요청 불필요) */
+  var y=ytThumb(yt);
+  if(y){ apply(y); return; }
+
+  /* 2) 그 외(숲 등)는 서버가 페이지에서 미리보기 이미지를 읽어옴 */
+  var url = soop || yt;
   if(!url){ if(manual) st.textContent='먼저 숲이나 유튜브 주소를 입력해 주세요'; return; }
-  if(manual) st.textContent='썸네일 가져오는 중…'; else toast('썸네일 확인 중…');
+  if(manual) st.textContent='썸네일 가져오는 중…';
   try{
     var r=await fetch(API+'/ogimage?url='+encodeURIComponent(url),{headers:DB.headers(false)});
     var j={};
@@ -468,11 +483,7 @@ async function fetchThumb(manual){
       else toast('썸네일을 못 가져왔어요 — 직접 올려주세요');
       return;
     }
-    bUrl=j.image;
-    document.getElementById('bPrevImg').src=j.image;
-    document.getElementById('bPrev').style.display='block';
-    st.textContent='';
-    toast('썸네일을 가져왔어요');
+    apply(j.image);
   }catch(e){
     console.error(e);
     if(manual) st.textContent='실패: '+(e.message||'네트워크 오류');
