@@ -19,7 +19,7 @@
 .tabs button.on{background:var(--pink);border-color:var(--pink);color:#fff}
 .panel{display:none}.panel.on{display:block}
 
-.box{background:var(--card);border-radius:18px;padding:26px;box-shadow:var(--shadow);margin-bottom:18px}
+.box{background:#fff;border-radius:18px;padding:26px 26px 24px;box-shadow:var(--shadow);margin-bottom:18px;overflow:hidden}
 .box h3{font-family:var(--disp);font-weight:400;font-size:22px;margin-bottom:20px;color:var(--ink);
   padding-bottom:12px;border-bottom:2px solid var(--pink-soft);display:flex;align-items:center;gap:8px}
 .box h3::before{content:"";width:9px;height:9px;border-radius:3px;background:var(--pink);flex-shrink:0}
@@ -28,10 +28,10 @@
 .frow:last-of-type{margin-bottom:0;border:none}
 .frow textarea{border-radius:12px}
 .box>.frow:last-of-type{padding-bottom:4px}
-.frow,.frow>div{background:transparent;border:0}
+.frow,.frow>div,.frow label{background:transparent;border:0;box-shadow:none}
+.box hr{display:none}
 .frow:last-of-type{margin-bottom:0}
 .box>*:last-child{border-bottom:0}
-.box,.box *{background-color:inherit}
 .box input,.box textarea,.box .drop{background-color:#fff !important}
 .frow label{font-size:14px;color:var(--sub)}
 .frow input,.frow textarea{width:100%;border:1.5px solid var(--line);border-radius:12px;
@@ -45,7 +45,7 @@
 .itembtns{display:flex;flex-direction:column;gap:6px;flex-shrink:0;width:74px}
 .btn.edit,.btn.del{width:100%;padding:7px 0;font-size:12.5px;border-radius:10px;text-align:center;
   font-family:var(--body);cursor:pointer;transition:.15s}
-.btn.edit{background:var(--pink);color:#fff;border:1.5px solid var(--pink)}
+.btn.edit{background:var(--pink) !important;color:#fff !important;border:1.5px solid var(--pink)}
 .btn.edit:hover{background:var(--pink-deep);border-color:var(--pink-deep)}
 .btn.del{background:#fff;color:#c8697f;border:1.5px solid var(--line)}
 .btn.del:hover{background:#fff0f4;border-color:#e79aae;color:#b3455f}
@@ -71,9 +71,13 @@
 .item.dragging{opacity:.4}
 .item.editing{border-color:var(--pink);box-shadow:0 0 0 3px var(--pink-soft)}
 .item.overtop{border-top:3px solid var(--pink)}
-.grip{cursor:grab;color:var(--line);font-size:17px;line-height:1;letter-spacing:-3px;
-  user-select:none;padding-top:4px;flex-shrink:0}
-.grip:hover{color:var(--pink)}
+.grip{cursor:grab;flex-shrink:0;width:22px;height:34px;align-self:center;
+  display:grid;grid-template-columns:repeat(2,5px);grid-template-rows:repeat(3,5px);
+  gap:4px;align-content:center;justify-content:center;opacity:.45;transition:.15s}
+.grip i{display:block;width:5px;height:5px;border-radius:50%;background:var(--sub)}
+.grip:hover{opacity:1}
+.grip:hover i{background:var(--pink)}
+.grip:active{cursor:grabbing}
 .grip:active{cursor:grabbing}
 .item .thumb64{width:56px;height:70px;border-radius:10px;object-fit:cover;flex-shrink:0;background:var(--pink-soft)}
 .item .body{flex:1;min-width:0}
@@ -132,40 +136,15 @@
     </div>
 
     <div class="tabs">
-      <button class="on" data-t="gallery" onclick="tab('gallery')">🖼 화보</button>
-      <button data-t="broadcast" onclick="tab('broadcast')">🎬 방송</button>
+      <button class="on" data-t="broadcast" onclick="tab('broadcast')">🎬 방송 히스토리</button>
+      <button data-t="gallery" onclick="tab('gallery')">🖼 월간쿠룽</button>
       <button data-t="inquiry" onclick="tab('inquiry')">💌 문의</button>
     </div>
 
-    <!-- ───── 화보 ───── -->
-    <div class="panel on" id="p-gallery">
-      <div class="box">
-        <h3 id="gHead">화보 올리기</h3>
-        <div class="drop" id="drop">
-          <span class="big">📷</span>
-          사진을 끌어다 놓거나 클릭해서 선택
-          <div class="hint">JPG · PNG · WEBP</div>
-        </div>
-        <input type="file" id="file" accept="image/*" style="display:none">
-        <div class="preview" id="prev"><img id="prevImg" src="" alt=""></div>
-        <div style="margin-top:16px">
-          <div class="frow"><label>제목</label><input id="gTitle" spellcheck="false" placeholder="제목을 입력해주세요."></div>
-          <div class="frow top"><label>설명</label><textarea id="gDesc" rows="3" spellcheck="false" placeholder="설명을 입력해주세요."></textarea></div>
-        </div>
-        <div class="actions">
-          <span class="stat" id="gStat"></span>
-          <button class="btn ghost" id="gCancel" style="display:none;background:var(--pink-soft);color:var(--pink-deep)" onclick="cancelGallery()">취소</button>
-          <button class="btn" id="gSubmit" onclick="saveGallery()">등록하기</button>
-        </div>
-      </div>
-      <div class="hint" style="margin:0 4px 8px">⋮⋮ 를 잡고 끌어서 순서를 바꿀 수 있어요</div>
-      <div class="list" id="gList"></div>
-    </div>
-
     <!-- ───── 방송 ───── -->
-    <div class="panel" id="p-broadcast">
+    <div class="panel on" id="p-broadcast">
       <div class="box">
-        <h3 id="bHead">방송 등록</h3>
+        <h3 id="bHead">방송 히스토리 등록</h3>
         <div class="frow"><label>제목</label><input id="bTitle" spellcheck="false" placeholder="방송 제목을 입력해주세요."></div>
         <div class="frow"><label>방송일</label><input id="bDate" type="datetime-local"></div>
         <div class="frow"><label>태그</label><input id="bTags" spellcheck="false" placeholder="쉼표로 구분(ex. 소통, 종겜)"></div>
@@ -185,8 +164,33 @@
           <button class="btn" id="bSubmit" onclick="saveBroadcast()">등록하기</button>
         </div>
       </div>
-      <div class="hint" style="margin:0 4px 8px">⋮⋮ 를 잡고 끌어서 순서를 바꿀 수 있어요</div>
+      <div class="hint" style="margin:0 4px 8px">점 6개를 잡고 끌어서 순서를 바꿀 수 있어요</div>
       <div class="list" id="bList"></div>
+    </div>
+
+    <!-- ───── 화보 ───── -->
+    <div class="panel" id="p-gallery">
+      <div class="box">
+        <h3 id="gHead">월간쿠룽 등록</h3>
+        <div class="drop" id="drop">
+          <span class="big">📷</span>
+          사진을 끌어다 놓거나 클릭해서 선택
+          <div class="hint">JPG · PNG · WEBP</div>
+        </div>
+        <input type="file" id="file" accept="image/*" style="display:none">
+        <div class="preview" id="prev"><img id="prevImg" src="" alt=""></div>
+        <div style="margin-top:16px">
+          <div class="frow"><label>제목</label><input id="gTitle" spellcheck="false" placeholder="제목을 입력해주세요."></div>
+          <div class="frow top"><label>설명</label><textarea id="gDesc" rows="3" spellcheck="false" placeholder="설명을 입력해주세요."></textarea></div>
+        </div>
+        <div class="actions">
+          <span class="stat" id="gStat"></span>
+          <button class="btn ghost" id="gCancel" style="display:none;background:var(--pink-soft);color:var(--pink-deep)" onclick="cancelGallery()">취소</button>
+          <button class="btn" id="gSubmit" onclick="saveGallery()">등록하기</button>
+        </div>
+      </div>
+      <div class="hint" style="margin:0 4px 8px">점 6개를 잡고 끌어서 순서를 바꿀 수 있어요</div>
+      <div class="list" id="gList"></div>
     </div>
 
     <!-- ───── 문의 ───── -->
@@ -279,7 +283,7 @@ function cancelGallery(){
   document.getElementById('gTitle').value='';
   document.getElementById('gDesc').value='';
   document.getElementById('prev').style.display='none';
-  document.getElementById('gHead').textContent='화보 올리기';
+  document.getElementById('gHead').textContent='월간쿠룽 등록';
   document.getElementById('gSubmit').textContent='등록하기';
   document.getElementById('gCancel').style.display='none';
   document.getElementById('gStat').textContent='';
@@ -293,7 +297,7 @@ function editGallery(id){
   document.getElementById('gDesc').value=g.description||'';
   if(gUrl){ document.getElementById('prevImg').src=gUrl;
             document.getElementById('prev').style.display='block'; }
-  document.getElementById('gHead').textContent='화보 수정';
+  document.getElementById('gHead').textContent='월간쿠룽 수정';
   document.getElementById('gSubmit').textContent='수정 완료';
   document.getElementById('gCancel').style.display='inline-block';
   loadGallery();
@@ -331,7 +335,7 @@ async function loadGallery(){
     if(!GAL.length){ box.innerHTML='<div class="empty2">등록된 화보가 없어요</div>'; return; }
     box.innerHTML=GAL.map(function(g,i){
       return '<div class="item'+(gEditId===g.id?' editing':'')+'" draggable="true" data-i="'+i+'">'+
-        '<span class="grip">⋮⋮</span>'+
+        '<span class="grip"><i></i><i></i><i></i><i></i><i></i><i></i></span>'+
         (g.image_url?'<img class="thumb64" src="'+esc(g.image_url)+'" alt="">':'<div class="thumb64"></div>')+
         '<div class="body"><div class="t">'+esc(g.title)+'</div>'+
         '<div class="m">'+esc(String(g.created_at||'').slice(0,16))+'</div>'+
@@ -396,7 +400,7 @@ function cancelBroadcast(){
   bEditId=null; bUrl='';
   ['bTitle','bTags','bSoop','bYt'].forEach(function(id){ document.getElementById(id).value=''; });
   document.getElementById('bPrev').style.display='none';
-  document.getElementById('bHead').textContent='방송 등록';
+  document.getElementById('bHead').textContent='방송 히스토리 등록';
   document.getElementById('bSubmit').textContent='등록하기';
   document.getElementById('bCancel').style.display='none';
   document.getElementById('bStat').textContent='';
@@ -414,7 +418,7 @@ function editBroadcast(id){
   document.getElementById('bYt').value=b.youtube_url||'';
   if(bUrl){ document.getElementById('bPrevImg').src=bUrl;
             document.getElementById('bPrev').style.display='block'; }
-  document.getElementById('bHead').textContent='방송 수정';
+  document.getElementById('bHead').textContent='방송 히스토리 수정';
   document.getElementById('bSubmit').textContent='수정 완료';
   document.getElementById('bCancel').style.display='inline-block';
   loadBroadcast();
@@ -470,7 +474,7 @@ async function loadBroadcast(){
         ? '<img class="thumb64" style="width:88px;height:56px" src="'+esc(thumb)+'" alt="">'
         : '<div class="thumb64" style="width:88px;height:56px"></div>';
       return '<div class="item'+(bEditId===b.id?' editing':'')+'" draggable="true" data-i="'+i+'">'+
-        '<span class="grip">⋮⋮</span>'+th+
+        '<span class="grip"><i></i><i></i><i></i><i></i><i></i><i></i></span>'+th+
         '<div class="body"><div class="t">'+esc(b.title)+'</div>'+
         '<div class="m">'+esc(String(b.broadcast_date||'').replace('T',' '))+'</div>'+
         (tags?'<div style="margin-top:6px">'+tags+'</div>':'')+
