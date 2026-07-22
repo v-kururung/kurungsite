@@ -182,7 +182,6 @@ mark{background:#ffe9a8;color:inherit;border-radius:3px;padding:0 1px}
             </div>
             <input type="file" id="bFile" accept="image/*" style="display:none">
             <div class="preview" id="bPrev" style="text-align:left"><img id="bPrevImg" src="" alt="" style="max-height:140px"></div>
-            <div class="hint">비워두면 유튜브 썸네일이 자동으로 사용돼요</div>
           </div>
         </div>
         <div class="actions">
@@ -480,12 +479,17 @@ async function fetchThumb(manual){
   }
 }
 
-/* 주소를 입력하고 벗어나면 썸네일 자동으로 가져오기 */
+/* 주소 입력이 끝나면 잠시 후 썸네일 자동으로 가져오기 */
 (function(){
+  var timer=null;
   ['bSoop','bYt'].forEach(function(id){
     var el=document.getElementById(id);
-    el.addEventListener('change',function(){
-      if(el.value.trim() && !bUrl) fetchThumb(false);
+    el.addEventListener('input',function(){
+      clearTimeout(timer);
+      var v=el.value.trim();
+      if(!v || bUrl) return;
+      if(!/^https?:\/\//i.test(v)) return;
+      timer=setTimeout(function(){ fetchThumb(false); }, 700);
     });
   });
 })();
