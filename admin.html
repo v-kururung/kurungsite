@@ -25,6 +25,9 @@
 .box h3::before{content:"";width:9px;height:9px;border-radius:3px;background:var(--pink);flex-shrink:0}
 .frow{display:grid;grid-template-columns:110px 1fr;gap:10px;align-items:center;margin-bottom:12px}
 .frow.top{align-items:flex-start}
+.frow,.frow>div{background:transparent}
+.box,.box *{background-color:inherit}
+.box input,.box textarea,.box .drop{background-color:#fff !important}
 .frow label{font-size:14px;color:var(--sub)}
 .frow input,.frow textarea{width:100%;border:1.5px solid var(--line);border-radius:12px;
   padding:10px 13px;font-family:var(--body);font-size:14px;background:#fff;
@@ -44,7 +47,7 @@
 
 .drop{border:2px dashed var(--line);border-radius:16px;padding:30px 20px;text-align:center;
   color:var(--sub);cursor:pointer;transition:.2s;background:#fff}
-.drop:hover,.drop.over{border-color:var(--pink);background:var(--pink-soft);color:var(--pink-deep)}
+.drop:hover,.drop.over{border-color:var(--pink);color:var(--pink-deep)}
 .drop .big{font-size:30px;display:block;margin-bottom:6px}
 .drop.small{padding:16px;font-size:13px}
 .drop.small .big{font-size:20px;margin-bottom:3px}
@@ -69,6 +72,13 @@
   font-size:11.5px;padding:2px 9px;border-radius:20px;margin-right:5px}
 .copyable{color:var(--pink-deep);cursor:pointer;border-bottom:1px dashed var(--pink);padding-bottom:1px}
 .copyable:hover{background:var(--pink-soft);border-radius:4px}
+.item.done{opacity:.5}
+.item.done .t{text-decoration:line-through}
+.chk{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--sub);
+  cursor:pointer;user-select:none;white-space:nowrap}
+.chk input{width:15px;height:15px;accent-color:var(--pink);cursor:pointer;margin:0}
+.donebadge{display:inline-block;background:var(--pink-soft);color:var(--pink-deep);
+  font-size:11px;padding:2px 9px;border-radius:20px;margin-left:6px}
 .empty2{text-align:center;color:var(--sub);padding:40px 0;font-size:14px}
 
 .toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(20px);
@@ -481,16 +491,29 @@ async function loadInquiry(){
     var rows=await DB.list('inquiries');
     if(!rows.length){ box.innerHTML='<div class="empty2">받은 문의가 없어요</div>'; return; }
     box.innerHTML=rows.map(function(q){
+      var isDone = !!(q.done && q.done!=='0');
       var c=q.contact
         ? '<span class="copyable" onclick="copyText(this.textContent)">'+esc(q.contact)+'</span>'
         : '<span style="color:var(--sub)">연락처 없음</span>';
-      return '<div class="item"><div class="body">'+
-        '<div class="t">'+esc(q.nickname)+'</div>'+
+      return '<div class="item'+(isDone?' done':'')+'"><div class="body">'+
+        '<div class="t">'+esc(q.nickname)+(isDone?'<span class="donebadge">처리완료</span>':'')+'</div>'+
         '<div class="m">'+esc(String(q.created_at||'').slice(0,16))+' · '+c+'</div>'+
         '<div class="msg">'+esc(q.message)+'</div>'+
-        '</div><button class="btn del" onclick="delItem(\'inquiries\','+q.id+')">삭제</button></div>';
+        '</div><div class="itembtns">'+
+        '<label class="chk"><input type="checkbox" '+(isDone?'checked':'')+
+        ' onchange="toggleDone('+q.id+',this.checked)">처리</label>'+
+        '<button class="btn del" onclick="delItem(\'inquiries\','+q.id+')">삭제</button>'+
+        '</div></div>';
     }).join('');
   }catch(e){ box.innerHTML='<div class="empty2">불러오기 실패</div>'; }
+}
+
+async function toggleDone(id, val){
+  try{
+    await DB.update('inquiries', id, { done: val ? 1 : 0 });
+    toast(val ? '처리 완료로 표시했어요' : '미처리로 되돌렸어요');
+    loadInquiry();
+  }catch(e){ toast('변경 실패'); loadInquiry(); }
 }
 
 function copyText(t){

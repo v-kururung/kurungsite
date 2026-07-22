@@ -65,19 +65,34 @@ export async function onRequest(context) {
     /* ───── 방송 ───── */
     if (seg === 'broadcasts') {
       if (method === 'GET') {
-        const { results } = await env.DB
-          .prepare('SELECT * FROM broadcasts ORDER BY sort_order ASC, created_at DESC')
-          .all();
-        return ok(results || []);
+        try {
+          const { results } = await env.DB
+            .prepare('SELECT * FROM broadcasts ORDER BY sort_order ASC, created_at DESC')
+            .all();
+          return ok(results || []);
+        } catch (_) {           /* sort_order 컬럼이 아직 없는 경우 */
+          const { results } = await env.DB
+            .prepare('SELECT * FROM broadcasts ORDER BY created_at DESC')
+            .all();
+          return ok(results || []);
+        }
       }
       if (method === 'POST') {
         if (!isAdmin(request, env)) return fail('unauthorized', 401);
         const b = await request.json();
-        await env.DB.prepare(
-          `INSERT INTO broadcasts (title, broadcast_date, tags, youtube_url, soop_url, thumbnail_url, sort_order)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`
-        ).bind(b.title || '', b.broadcast_date || '', b.tags || '',
-               b.youtube_url || '', b.soop_url || '', b.thumbnail_url || '', b.sort_order || 0).run();
+        try {
+          await env.DB.prepare(
+            `INSERT INTO broadcasts (title, broadcast_date, tags, youtube_url, soop_url, thumbnail_url, sort_order)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`
+          ).bind(b.title || '', b.broadcast_date || '', b.tags || '',
+                 b.youtube_url || '', b.soop_url || '', b.thumbnail_url || '', b.sort_order || 0).run();
+        } catch (_) {
+          await env.DB.prepare(
+            `INSERT INTO broadcasts (title, broadcast_date, tags, youtube_url, soop_url, thumbnail_url)
+             VALUES (?, ?, ?, ?, ?, ?)`
+          ).bind(b.title || '', b.broadcast_date || '', b.tags || '',
+                 b.youtube_url || '', b.soop_url || '', b.thumbnail_url || '').run();
+        }
         return ok({ saved: true });
       }
       if (method === 'PUT' && id) {
@@ -143,10 +158,24 @@ export async function onRequest(context) {
       }
       if (method === 'GET') {                     /* 조회는 관리자만 */
         if (!isAdmin(request, env)) return fail('unauthorized', 401);
-        const { results } = await env.DB
-          .prepare('SELECT * FROM inquiries ORDER BY created_at DESC')
-          .all();
-        return ok(results || []);
+        try {
+          const { results } = await env.DB
+            .prepare('SELECT * FROM inquiries ORDER BY done ASC, created_at DESC')
+            .all();
+          return ok(results || []);
+        } catch (_) {           /* done 컬럼이 아직 없는 경우 */
+          const { results } = await env.DB
+            .prepare('SELECT * FROM inquiries ORDER BY created_at DESC')
+            .all();
+          return ok(results || []);
+        }
+      }
+      if (method === 'PUT' && id) {                /* 처리 여부 변경 */
+        if (!isAdmin(request, env)) return fail('unauthorized', 401);
+        const q = await request.json();
+        await env.DB.prepare('UPDATE inquiries SET done=? WHERE id=?')
+          .bind(q.done ? 1 : 0, id).run();
+        return ok({ updated: true });
       }
       if (method === 'DELETE' && id) {
         if (!isAdmin(request, env)) return fail('unauthorized', 401);
