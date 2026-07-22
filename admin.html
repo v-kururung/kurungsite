@@ -175,7 +175,11 @@ mark{background:#ffe9a8;color:inherit;border-radius:3px;padding:0 1px}
         <div class="frow"><label>유튜브 주소</label><input id="bYt" spellcheck="false" autocomplete="off" placeholder="비워두면 '준비 중'으로 표시"></div>
         <div class="frow top"><label>썸네일</label>
           <div>
-            <div class="drop small" id="bDrop"><span class="big">🖼</span><span>사진 선택 또는 끌어다 놓기</span></div>
+            <div style="display:flex;gap:8px;align-items:stretch">
+              <div class="drop small" id="bDrop" style="flex:1"><span class="big">🖼</span><span>사진 선택 또는 끌어다 놓기</span></div>
+              <button type="button" class="btn" id="bFetch" onclick="fetchThumb(true)"
+                style="padding:0 14px;font-size:12.5px;white-space:nowrap;border-radius:12px">주소에서 가져오기</button>
+            </div>
             <input type="file" id="bFile" accept="image/*" style="display:none">
             <div class="preview" id="bPrev" style="text-align:left"><img id="bPrevImg" src="" alt="" style="max-height:140px"></div>
             <div class="hint">비워두면 유튜브 썸네일이 자동으로 사용돼요</div>
@@ -449,19 +453,20 @@ function removeTag(i){ TAGS.splice(i,1); renderChips(); }
 })();
 
 /* 숲·유튜브 주소에서 썸네일 가져오기 */
-async function fetchThumb(){
+async function fetchThumb(manual){
   var url=(document.getElementById('bSoop').value||'').trim()
         ||(document.getElementById('bYt').value||'').trim();
   var st=document.getElementById('bStat');
-  if(!url){ st.textContent='먼저 숲이나 유튜브 주소를 입력해 주세요'; return; }
-  st.textContent='썸네일 가져오는 중…';
+  if(!url){ if(manual) st.textContent='먼저 숲이나 유튜브 주소를 입력해 주세요'; return; }
+  if(manual) st.textContent='썸네일 가져오는 중…'; else toast('썸네일 확인 중…');
   try{
     var r=await fetch(API+'/ogimage?url='+encodeURIComponent(url),{headers:DB.headers(false)});
     var j={};
     try{ j=await r.json(); }catch(_){}
     if(!r.ok){
-      st.textContent='실패: '+(j.error||('HTTP '+r.status));
       console.warn('[ogimage]', r.status, j);
+      if(manual) st.textContent='실패: '+(j.error||('HTTP '+r.status));
+      else toast('썸네일을 못 가져왔어요 — 직접 올려주세요');
       return;
     }
     bUrl=j.image;
@@ -469,9 +474,21 @@ async function fetchThumb(){
     document.getElementById('bPrev').style.display='block';
     st.textContent='';
     toast('썸네일을 가져왔어요');
-  }catch(e){ st.textContent='실패: '+(e.message||'네트워크 오류'); }
+  }catch(e){
+    console.error(e);
+    if(manual) st.textContent='실패: '+(e.message||'네트워크 오류');
+  }
 }
 
+/* 주소를 입력하고 벗어나면 썸네일 자동으로 가져오기 */
+(function(){
+  ['bSoop','bYt'].forEach(function(id){
+    var el=document.getElementById(id);
+    el.addEventListener('change',function(){
+      if(el.value.trim() && !bUrl) fetchThumb(false);
+    });
+  });
+})();
 
 function cancelBroadcast(){
   bEditId=null; bUrl='';
