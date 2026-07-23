@@ -36,6 +36,7 @@
       <button class="on" data-t="broadcast" onclick="tab('broadcast')">🎬 방송 히스토리</button>
       <button data-t="gallery" onclick="tab('gallery')">🖼 월간쿠룽</button>
       <button data-t="inquiry" onclick="tab('inquiry')">💌 문의</button>
+      <button data-t="profile" onclick="tab('profile')">🧝 프로필</button>
     </div>
 
     <!-- ───── 방송 ───── -->
@@ -113,6 +114,36 @@
       </div>
       <div class="list" id="iList"></div>
     </div>
+
+    <!-- ───── 프로필 ───── -->
+    <div class="panel" id="p-profile">
+      <div class="box">
+        <h3>프로필 사진</h3>
+        <div class="profgrid">
+          <div class="profcol">
+            <div class="pcap">지금 사진</div>
+            <div class="pframe" id="pNow"><span class="ph">🧝</span></div>
+          </div>
+          <div class="profcol">
+            <div class="pcap">바꿀 사진</div>
+            <div class="pframe drop" id="pDrop">
+              <span id="pHint"><span class="big">📷</span>끌어다 놓거나<br>클릭해서 선택</span>
+              <img id="pNewImg" src="" alt="" style="display:none">
+            </div>
+            <input type="file" id="pFile" accept="image/*" style="display:none">
+          </div>
+          <div class="pnote">
+            세로로 긴 사진이 잘 맞아요 (권장 720×1000)<br>
+            저장하면 메인 페이지에 바로 반영됩니다.
+          </div>
+        </div>
+        <div class="actions">
+          <span class="stat" id="pStat"></span>
+          <button class="btn sub" id="pCancel" style="display:none" onclick="cancelProfile()">되돌리기</button>
+          <button class="btn" id="pSubmit" onclick="saveProfile()" disabled>저장하기</button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -149,7 +180,7 @@ function enterApp(){
   document.getElementById('login').style.display='none';
   document.getElementById('app').style.display='block';
   setToday();
-  loadGallery(); loadBroadcast(); loadInquiry();
+  loadGallery(); loadBroadcast(); loadInquiry(); loadProfile();
 }
 (function(){ if(DB.token()) fetch(API+'/auth',{method:'POST',headers:{'X-Admin-Token':DB.token()}})
   .then(function(r){ if(r.ok) enterApp(); }); })();
@@ -823,6 +854,60 @@ async function delItem(table,id){
     else if(table==='broadcasts') loadBroadcast();
     else loadInquiry();
   }catch(e){ toast('삭제 실패: '+(e.message||'')); console.error(e); }
+}
+
+/* ───── 프로필 사진 ─────
+   config.js 의 값은 그대로 두고, 관리자에서 바꾼 사진이 있으면
+   그 주소를 settings 에 저장해 덮어씁니다. */
+var pfNow='';   /* 지금 쓰이는 사진 */
+var pfNew='';   /* 새로 올렸지만 아직 저장 전인 사진 */
+
+async function loadProfile(){
+  var fallback=(CFG.profile||{}).image||'';
+  try{
+    var st=await DB.settings();
+    pfNow=(st && st.profile_image) || fallback;
+  }catch(e){ pfNow=fallback; }
+
+  document.getElementById('pNow').innerHTML = pfNow
+    ? '<img src="'+esc(pfNow)+'" alt="">'
+    : '<span class="ph">🧝</span>';
+}
+
+bindDrop(document.getElementById('pDrop'), document.getElementById('pFile'), function(url){
+  pfNew=url;
+  var img=document.getElementById('pNewImg');
+  img.src=url; img.style.display='block';
+  document.getElementById('pHint').style.display='none';
+  document.getElementById('pCancel').style.display='';
+  document.getElementById('pSubmit').disabled=false;
+  document.getElementById('pStat').textContent='아직 저장 전이에요';
+});
+
+function cancelProfile(){
+  pfNew='';
+  var img=document.getElementById('pNewImg');
+  img.style.display='none'; img.src='';
+  document.getElementById('pHint').style.display='';
+  document.getElementById('pCancel').style.display='none';
+  document.getElementById('pSubmit').disabled=true;
+  document.getElementById('pStat').textContent='';
+}
+
+async function saveProfile(){
+  var st=document.getElementById('pStat');
+  if(!pfNew){ st.textContent='먼저 사진을 올려주세요'; return; }
+  var btn=document.getElementById('pSubmit');
+  btn.disabled=true; st.textContent='저장 중…';
+  try{
+    await DB.saveSetting('profile_image', pfNew);
+    cancelProfile();
+    await loadProfile();
+    toast('프로필 사진을 바꿨어요');
+  }catch(e){
+    st.textContent='저장 실패 — 잠시 후 다시 시도해 주세요';
+    btn.disabled=false;
+  }
 }
 </script>
 </body>

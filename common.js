@@ -165,6 +165,22 @@ var DB = {
     return await r.json();
   },
 
+  /* 사이트 설정 읽기 (프로필 사진 등) */
+  settings: async function(){
+    var r = await fetch(API+'/settings', { headers: DB.headers(false) });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return await r.json();
+  },
+
+  /* 사이트 설정 저장 — 관리자만 */
+  saveSetting: async function(key, value){
+    var r = await fetch(API+'/settings/'+encodeURIComponent(key), {
+      method:'PUT', headers: DB.headers(true), body: JSON.stringify({ value: value })
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return await r.json();
+  },
+
   upload: async function(file){
     var fd = new FormData(); fd.append('file', file);
     var h = {}; var t=DB.token(); if(t) h['X-Admin-Token']=t;

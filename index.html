@@ -54,13 +54,21 @@
 initPage('index.html');
 renderLinks('#links');
 
+/* 프로필 사진 — 관리자에서 바꾼 사진이 있으면 그걸 씁니다 */
+(async function(){
+  var p=CFG.profile||{}, src=p.image||'';
+  try{
+    var st=await DB.settings();
+    if(st && st.profile_image) src=st.profile_image;
+  }catch(e){ }
+  document.getElementById('portrait').innerHTML = src
+    ? '<img src="'+esc(src)+'" alt="'+esc(p.nameMain)+'" onerror="this.remove()">'
+    : '<div class="ph">&#129498;</div>';
+})();
+
 /* 프로필 */
 (function(){
   var p=CFG.profile||{};
-  var port=document.getElementById('portrait');
-  port.innerHTML = p.image
-    ? '<img src="'+esc(p.image)+'" alt="'+esc(p.nameMain)+'" onerror="this.remove()">'
-    : '<div class="ph">&#129498;</div>';
 
   document.getElementById('pName').innerHTML =
     esc(p.nameMain)+(p.nameAccent?'<span>'+esc(p.nameAccent)+'</span>':'');

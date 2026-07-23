@@ -235,18 +235,43 @@ export async function onRequest(context) {
       }
     }
 
-    /* ───── 관리자 토큰 확인 ───── */
-    if (seg === 'auth') {
-      /* GET /api/auth — 진단용.
-         ADMIN_TOKEN 이 이 함수에 연결됐는지만 true/false 로 알려줍니다.
-         값 자체는 절대 나가지 않습니다. 원인 확인 후 지워도 됩니다. */
+    /* ───── 사이트 설정 ─────
+       프로필 사진처럼 관리자가 바꾸는 값을 key/value 로 저장합니다.
+       표가 없으면 알아서 만들기 때문에 따로 SQL 을 실행할 필요는 없어요. */
+    if (seg === 'settings') {
+      const ensure = () => env.DB.prepare(
+        'CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)'
+      ).run();
+
+      /* 조회는 누구나 — 방문자 페이지에서도 읽어야 합니다 */
       if (method === 'GET') {
-        return ok({ configured: !!env.ADMIN_TOKEN });
+        try {
+          await ensure();
+          const { results } = await env.DB.prepare('SELECT key, value FROM settings').all();
+          const out = {};
+          (results || []).forEach((r) => { out[r.key] = r.value; });
+          return ok(out);
+        } catch (_) {
+          return ok({});          /* 아직 아무것도 없으면 빈 값 */
+        }
       }
-      /* POST /api/auth — 실제 로그인 확인 */
-      if (method === 'POST') {
-        return isAdmin(request, env) ? ok({ ok: true }) : fail('unauthorized', 401);
+
+      /* 저장은 관리자만 */
+      if (method === 'PUT' && id) {
+        if (!isAdmin(request, env)) return fail('unauthorized', 401);
+        const b = await request.json();
+        await ensure();
+        await env.DB.prepare(
+          `INSERT INTO settings (key, value) VALUES (?, ?)
+           ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+        ).bind(id, String(b.value == null ? '' : b.value)).run();
+        return ok({ saved: true });
       }
+    }
+
+    /* ───── 관리자 토큰 확인 (로그인용) ───── */
+    if (seg === 'auth' && method === 'POST') {
+      return isAdmin(request, env) ? ok({ ok: true }) : fail('unauthorized', 401);
     }
 
     return fail('not found', 404);
