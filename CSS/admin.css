@@ -226,17 +226,41 @@ button,input,textarea{font-family:var(--a-font);letter-spacing:-.02em}
 .pframe.editing.grabbing{cursor:grabbing}
 .pframe #pNewImg{position:absolute;max-width:none;object-fit:fill;
   user-select:none;-webkit-user-drag:none}
+.pframe.editing:focus-visible{outline:2px solid var(--a-primary);outline-offset:2px}
 
-.pzoom{display:flex;align-items:center;gap:6px;margin-top:10px;flex-wrap:wrap}
-.pzoom input[type=range]{flex:1;min-width:70px;accent-color:var(--a-primary);
+/* 삼등분 안내선 — 끌고 있을 때만 살짝 보입니다 */
+.pguide{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .15s;
+  background:
+    linear-gradient(to right,transparent 33.33%,rgba(255,255,255,.55) 33.33%,
+      rgba(255,255,255,.55) calc(33.33% + 1px),transparent calc(33.33% + 1px),
+      transparent 66.66%,rgba(255,255,255,.55) 66.66%,
+      rgba(255,255,255,.55) calc(66.66% + 1px),transparent calc(66.66% + 1px)),
+    linear-gradient(to bottom,transparent 33.33%,rgba(255,255,255,.55) 33.33%,
+      rgba(255,255,255,.55) calc(33.33% + 1px),transparent calc(33.33% + 1px),
+      transparent 66.66%,rgba(255,255,255,.55) 66.66%,
+      rgba(255,255,255,.55) calc(66.66% + 1px),transparent calc(66.66% + 1px))}
+.pframe.grabbing .pguide{opacity:1}
+
+.pzoom{margin-top:10px}
+.prow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.prow:last-child{margin-bottom:0}
+.pzoom input[type=range]{flex:1;min-width:60px;accent-color:var(--a-primary);
   cursor:pointer;margin:0}
+.pzoom .zval{font-size:11.5px;font-weight:600;color:var(--a-sub);
+  font-variant-numeric:tabular-nums;min-width:38px;text-align:right}
 .pzoom .zbtn{border:none;background:var(--g100);color:var(--a-sub);font-size:12px;
   font-weight:600;padding:6px 9px;border-radius:8px;cursor:pointer;
   font-family:var(--a-font);letter-spacing:-.02em;transition:.15s}
 .pzoom .zbtn:hover{background:var(--g200);color:var(--a-body)}
+.zbg{display:flex;align-items:center;gap:5px;background:var(--g100);color:var(--a-sub);
+  font-size:12px;font-weight:600;padding:4px 7px;border-radius:8px;cursor:pointer}
+.zbg input[type=color]{width:20px;height:20px;padding:0;border:none;border-radius:5px;
+  background:none;cursor:pointer}
+.zbg input[type=color]::-webkit-color-swatch-wrapper{padding:0}
+.zbg input[type=color]::-webkit-color-swatch{border:1px solid var(--a-line);border-radius:5px}
 
 .pnote{font-size:12.5px;color:var(--a-sub);line-height:1.8;
-  max-width:230px;padding-top:26px}
+  max-width:250px;padding-top:26px}
 .pnote b{font-weight:600;color:var(--a-body)}
 @media(max-width:640px){
   .profcol{width:calc(50% - 10px)}
