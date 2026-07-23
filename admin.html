@@ -1,914 +1,321 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="style.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="CSS/admin.css">
-</head>
-<body spellcheck="false">
+/* ═══════════════════════════════════════════════════════════
+   관리자 화면 전용 스타일 — 업무용 블루 테마
+   ───────────────────────────────────────────────────────────
+   방문자용 사이트(style.css)의 파스텔 핑크와는 별개입니다.
+   여긴 매일 들여다보는 작업 도구라, 국내 서비스에서 흔히 쓰는
+   회색 계조 + 파란 강조 조합으로 갑니다.
 
-<div id="sky"></div>
-<div class="toast" id="toast"></div>
+   색은 아래 토큰만 바꾸면 전체가 함께 바뀝니다.
+   ═══════════════════════════════════════════════════════════ */
 
-<div class="wrap">
-  <!-- 로그인 -->
-  <div class="login" id="login">
-    <h2>🔒 관리자</h2>
-    <p>관리자 토큰을 입력해 주세요</p>
-    <input id="tok" type="password" placeholder="ADMIN_TOKEN" onkeydown="if(event.key==='Enter')doLogin()">
-    <button class="btn" style="width:100%" onclick="doLogin()">들어가기</button>
-    <div class="stat" id="loginStat"></div>
-  </div>
+:root{
+  /* ── 회색 계조 ──
+     단계가 고르게 벌어져 있어서, 배경·면·선·글자를 각각
+     어느 단계에 둘지만 정하면 대비가 알아서 맞습니다 */
+  --g50 : #f9fafb;
+  --g100: #f2f4f6;
+  --g200: #e5e8eb;
+  --g300: #d1d6db;
+  --g400: #b0b8c1;
+  --g500: #8b95a1;
+  --g600: #6b7684;
+  --g700: #4e5968;
+  --g800: #333d4b;
+  --g900: #191f28;
 
-  <!-- 관리 화면 -->
-  <div id="app" style="display:none">
-    <div class="ahead">
-      <h1 id="adminTitle">관리자</h1>
-      <button class="out" onclick="doLogout()">로그아웃</button>
-    </div>
+  /* ── 바탕 ── */
+  --a-bg          : var(--g50);    /* 페이지 배경 */
+  --a-surface     : #ffffff;       /* 카드 · 영역 */
+  --a-line        : var(--g200);   /* 기본 테두리 */
+  --a-line-strong : var(--g300);   /* 진한 테두리 (호버) */
 
-    <div class="tabs">
-      <button class="on" data-t="broadcast" onclick="tab('broadcast')">🎬 방송 히스토리</button>
-      <button data-t="gallery" onclick="tab('gallery')">🖼 월간쿠룽</button>
-      <button data-t="inquiry" onclick="tab('inquiry')">💌 문의</button>
-      <button data-t="profile" onclick="tab('profile')">🧝 프로필</button>
-    </div>
+  /* ── 글자 ── */
+  --a-ink   : var(--g900);   /* 제목 */
+  --a-body  : var(--g800);   /* 본문 */
+  --a-sub   : var(--g600);   /* 보조 (라벨, 날짜) */
+  --a-faint : var(--g400);   /* 흐린 (플레이스홀더, 비활성) */
 
-    <!-- ───── 방송 ───── -->
-    <div class="panel on" id="p-broadcast">
-      <div class="box">
-        <h3 id="bHead">방송 히스토리 등록</h3>
-        <div class="frow"><label>제목</label><input id="bTitle" spellcheck="false" autocomplete="off" placeholder="방송 제목을 입력해주세요."></div>
-        <div class="frow"><label>방송일</label><input id="bDate" type="datetime-local" autocomplete="off"></div>
-        <div class="frow ftop"><label>태그</label>
-          <div>
-            <input id="bTagInput" spellcheck="false" autocomplete="off" placeholder="태그 입력 후 엔터">
-            <div class="chips" id="bChips"></div>
-          </div>
-        </div>
-        <div class="frow ftop"><label>영상 주소</label>
-          <div>
-            <input id="bUrlInput" spellcheck="false" autocomplete="off"
-                   placeholder="영상 주소 입력 후 엔터">
-            <div class="chips" id="bUrlChips"></div>
-          </div>
-        </div>
-        <div class="frow ftop"><label>썸네일</label>
-          <div>
-            <div style="display:flex;gap:8px;align-items:stretch">
-              <div class="drop small" id="bDrop" style="flex:1"><span class="big">🖼</span><span>직접 올리기 — 선택 또는 끌어다 놓기</span></div>
-              <button type="button" class="btn sub" id="bFetch" onclick="refreshThumbs(true)"
-                style="padding:0 14px;font-size:12.5px;white-space:nowrap">주소에서 다시 가져오기</button>
-            </div>
-            <input type="file" id="bFile" accept="image/*" style="display:none">
-            <div class="thumbpick" id="bThumbs"></div>
-            <div class="hint" id="bThumbHint" style="display:none"></div>
-          </div>
-        </div>
-        <div class="actions">
-          <span class="stat" id="bStat"></span>
-          <button class="btn sub" id="bCancel" style="display:none" onclick="cancelBroadcast()">취소</button>
-          <button class="btn" id="bSubmit" onclick="saveBroadcast()">등록하기</button>
-        </div>
-      </div>
-      <div class="lhead">영상 순서 관리</div>
-      <div class="list" id="bList"></div>
-    </div>
+  /* ── 강조 (파랑) ── */
+  --a-primary       : #3182f6;   /* 주요 버튼 · 선택 강조 */
+  --a-primary-hover : #1b64da;
+  --a-primary-press : #1957c2;
+  --a-primary-soft  : #e8f3ff;   /* 서브 버튼 면 · 선택 배경 */
+  --a-primary-soft2 : #d3e7fd;   /* 서브 버튼 호버 면 */
+  --a-primary-ink   : #1b64da;   /* 옅은 파랑 면 위 글자 */
 
-    <!-- ───── 화보 ───── -->
-    <div class="panel" id="p-gallery">
-      <div class="box">
-        <h3 id="gHead">월간쿠룽 등록</h3>
-        <div class="drop" id="drop">
-          <span class="big">📷</span>
-          사진을 끌어다 놓거나 클릭해서 선택
-          <div class="hint">JPG · PNG · WEBP</div>
-        </div>
-        <input type="file" id="file" accept="image/*" style="display:none">
-        <div class="preview" id="prev"><img id="prevImg" src="" alt=""></div>
-        <div style="margin-top:16px">
-          <div class="frow"><label>제목</label><input id="gTitle" spellcheck="false" autocomplete="off" placeholder="제목을 입력해주세요."></div>
-          <div class="frow ftop"><label>설명</label><textarea id="gDesc" rows="3" spellcheck="false" autocomplete="off" placeholder="설명을 입력해주세요."></textarea></div>
-        </div>
-        <div class="actions">
-          <span class="stat" id="gStat"></span>
-          <button class="btn sub" id="gCancel" style="display:none" onclick="cancelGallery()">취소</button>
-          <button class="btn" id="gSubmit" onclick="saveGallery()">등록하기</button>
-        </div>
-      </div>
-      <div class="lhead">화보 순서 관리</div>
-      <div class="list" id="gList"></div>
-    </div>
+  /* ── 삭제 (빨강) ── */
+  --a-danger      : #f04452;
+  --a-danger-ink  : #d9364a;
+  --a-danger-line : #f9c9ce;   /* 삭제 버튼 테두리 */
+  --a-danger-soft : #ffeff0;   /* 삭제 버튼 호버 면 */
 
-    <!-- ───── 문의 ───── -->
-    <div class="panel" id="p-inquiry">
-      <div class="isearch">
-        <span class="si">&#128269;</span>
-        <input id="iq" spellcheck="false" autocomplete="off"
-               placeholder="닉네임 · 연락처 · 내용 검색" oninput="renderInquiry()">
-      </div>
-      <div class="list" id="iList"></div>
-    </div>
+  /* ── 공통 형태 ── */
+  --a-radius   : 10px;
+  --a-radius-lg: 16px;
+  --a-focus    : 0 0 0 3px rgba(49,130,246,.18);
+  --a-shadow   : 0 1px 3px rgba(25,31,40,.05);
 
-    <!-- ───── 프로필 ───── -->
-    <div class="panel" id="p-profile">
-      <div class="box">
-        <h3>프로필 사진</h3>
-        <div class="profgrid">
-          <div class="profcol">
-            <div class="pcap">지금 사진</div>
-            <div class="pframe" id="pNow"><span class="ph">🧝</span></div>
-          </div>
-          <div class="profcol">
-            <div class="pcap">바꿀 사진</div>
-            <div class="pframe drop" id="pDrop">
-              <span id="pHint"><span class="big">📷</span>끌어다 놓거나<br>클릭해서 선택</span>
-              <img id="pNewImg" src="" alt="" style="display:none">
-            </div>
-            <input type="file" id="pFile" accept="image/*" style="display:none">
-          </div>
-          <div class="pnote">
-            세로로 긴 사진이 잘 맞아요 (권장 720×1000)<br>
-            저장하면 메인 페이지에 바로 반영됩니다.
-          </div>
-        </div>
-        <div class="actions">
-          <span class="stat" id="pStat"></span>
-          <button class="btn sub" id="pCancel" style="display:none" onclick="cancelProfile()">되돌리기</button>
-          <button class="btn" id="pSubmit" onclick="saveProfile()" disabled>저장하기</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script src="config.js"></script>
-<script src="common.js"></script>
-<script>
-applyTheme();
-document.getElementById('adminTitle').textContent = fullName()+' 관리자';
-
-function toast(msg){
-  var t=document.getElementById('toast');
-  t.textContent=msg; t.classList.add('on');
-  clearTimeout(t._h); t._h=setTimeout(function(){ t.classList.remove('on'); },1600);
+  --a-font: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
+            system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo',
+            'Noto Sans KR', 'Malgun Gothic', sans-serif;
 }
+
+/* ───── 기본 ───── */
+/* 탭마다 내용 길이가 달라 스크롤바가 생겼다 없어졌다 하면
+   그때마다 본문 폭이 흔들립니다. 자리를 미리 잡아둡니다. */
+html{scrollbar-gutter:stable}
+body{
+  background:var(--a-bg);
+  font-family:var(--a-font);
+  color:var(--a-body);
+  font-size:15px;
+  line-height:1.6;
+  letter-spacing:-.02em;
+}
+#sky{display:none}
+button,input,textarea{font-family:var(--a-font);letter-spacing:-.02em}
+::placeholder{color:var(--g500)}
+::selection{background:var(--a-primary-soft);color:var(--a-primary-ink)}
+
+/* ───── 상단 ───── */
+.ahead{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:22px 0 18px;flex-wrap:wrap}
+.ahead h1{font-size:22px;font-weight:700;color:var(--a-ink);letter-spacing:-.03em}
+
+/* ───── 탭 ───── */
+.tabs{display:flex;gap:6px;margin:4px 0 22px}
+.tabs button{border:none;background:var(--a-surface);color:var(--a-sub);
+  padding:10px 18px;border-radius:var(--a-radius);font-size:14px;font-weight:600;
+  cursor:pointer;transition:.15s;box-shadow:var(--a-shadow)}
+.tabs button:hover{background:var(--g100);color:var(--a-body)}
+.tabs button.on{background:var(--a-primary);color:#fff}
+.tabs button.on:hover{background:var(--a-primary-hover)}
+.panel{display:none}
+.panel.on{display:block}
+
+/* ───── 버튼 체계 ─────
+   한 화면에서 시선이 가야 할 곳은 하나뿐이라, 채워진 파랑은
+   그 영역의 최종 확정 동작에만 씁니다.
+
+   1) 주요 .btn        진한 파랑 채움 — 등록하기 · 수정 완료
+   2) 서브 .btn.sub    옅은 파랑 면   — 취소 · 다시 가져오기 · 목록의 수정
+   3) 기타 .btn.ghost  회색 면        — 로그아웃 등 중립 동작
+   4) 삭제 .btn.del    흰 면 + 붉은 선 — 유일하게 채우지 않은 버튼
+
+   수정과 삭제는 같은 줄에 붙어 있어서 형태를 맞추고 색으로만
+   구분합니다. 파랑과 빨강은 색상이 멀어 작은 글씨에서도 갈립니다. */
+.btn{border:none;background:var(--a-primary);color:#fff;padding:11px 22px;
+  border-radius:var(--a-radius);font-size:14px;font-weight:600;cursor:pointer;transition:.15s}
+.btn:hover{background:var(--a-primary-hover)}
+.btn:active{background:var(--a-primary-press)}
+.btn:focus-visible{outline:none;box-shadow:var(--a-focus)}
+
+.btn:disabled{background:var(--g200);color:var(--a-faint);cursor:not-allowed}
+.btn.sub{background:var(--a-primary-soft);color:var(--a-primary-ink)}
+.btn.sub:hover{background:var(--a-primary-soft2)}
+
+.btn.ghost,.ahead .out{border:none;background:var(--g100);color:var(--a-sub);
+  font-weight:600;padding:10px 18px;border-radius:var(--a-radius);font-size:13.5px;
+  cursor:pointer;transition:.15s;font-family:var(--a-font);letter-spacing:-.02em}
+.btn.ghost:hover,.ahead .out:hover{background:var(--g200);color:var(--a-body)}
+
+.btn.edit,.btn.del{width:100%;padding:8px 0;font-size:12.5px;border:1px solid transparent;
+  border-radius:8px;text-align:center;font-weight:600;cursor:pointer;transition:.15s}
+.btn.edit{background:var(--a-primary-soft);color:var(--a-primary-ink)}
+.btn.edit:hover{background:var(--a-primary-soft2)}
+.btn.del{background:var(--a-surface);color:var(--a-danger-ink);
+  border-color:var(--a-danger-line)}
+.btn.del:hover{background:var(--a-danger-soft);border-color:var(--a-danger)}
+
+/* ───── 카드(영역) ───── */
+.box{background:var(--a-surface);border-radius:var(--a-radius-lg);padding:26px 26px 22px;
+  box-shadow:var(--a-shadow);margin-bottom:16px;overflow:hidden}
+.box h3{font-size:17px;font-weight:700;color:var(--a-ink);margin-bottom:20px;
+  letter-spacing:-.03em;padding-bottom:16px;border-bottom:1px solid var(--a-line)}
+
+/* 목록 영역 제목 */
+.lhead{margin:30px 4px 12px;font-size:17px;font-weight:700;
+  color:var(--a-ink);letter-spacing:-.03em}
+
+/* ───── 입력 폼 ───── */
+.frow{display:grid;grid-template-columns:104px 1fr;gap:10px;align-items:center;margin-bottom:10px}
+.frow.ftop{align-items:flex-start}
+.frow.ftop label{padding-top:12px}
+.frow label{font-size:14px;color:var(--a-sub);font-weight:600}
+.frow input,.frow textarea{width:100%;border:1px solid var(--a-line);
+  border-radius:var(--a-radius);padding:11px 14px;font-size:14px;
+  background:var(--a-surface);color:var(--a-ink);outline:none;resize:vertical;
+  transition:border-color .15s, box-shadow .15s}
+.frow input:hover,.frow textarea:hover{border-color:var(--a-line-strong)}
+.frow input:focus,.frow textarea:focus{border-color:var(--a-primary);box-shadow:var(--a-focus)}
+/* 진짜 비활성일 때만 회색으로 채웁니다 */
+.frow input:disabled,.frow textarea:disabled{background:var(--g100);
+  border-color:var(--a-line);color:var(--a-faint);cursor:not-allowed}
+.actions{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:24px}
+.hint{font-size:12.5px;color:var(--a-faint);margin-top:6px}
+.stat{font-size:13px;color:var(--a-primary-ink);font-weight:500;min-height:18px}
+
+/* ───── 업로드 영역 ───── */
+.drop{border:1.5px dashed var(--a-line-strong);border-radius:var(--a-radius);
+  padding:30px 20px;text-align:center;color:var(--a-sub);cursor:pointer;
+  transition:.15s;background:var(--a-surface)}
+.drop:hover,.drop.over{border-color:var(--a-primary);color:var(--a-primary-ink);background:#f4f9ff}
+.drop .big{font-size:28px;display:block;margin-bottom:6px}
+.drop.small{padding:14px 16px;font-size:13px;display:flex;align-items:center;
+  justify-content:center;gap:9px}
+.drop.small .big{font-size:16px;margin:0;display:inline}
+.preview{margin-top:12px;display:none;text-align:center}
+.preview img{max-width:190px;max-height:230px;border-radius:var(--a-radius);
+  display:inline-block;box-shadow:0 2px 8px rgba(25,31,40,.08)}
+
+/* ───── 태그 칩 ───── */
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips:empty{margin-top:0}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--g100);
+  color:var(--a-sub);font-size:12.5px;padding:5px 8px 5px 11px;border-radius:8px}
+.chip b{font-weight:600;color:var(--a-body)}
+.chip button,.urlchip button{border:none;background:none;color:var(--a-faint);
+  cursor:pointer;font-size:14px;line-height:1;padding:0 1px;transition:.15s}
+.chip button:hover,.urlchip button:hover{color:var(--a-danger)}
+
+/* ───── 영상 주소 칩 ─────
+   플랫폼 구분은 로고가 하고, 칩 자체는 중립으로 둡니다 */
+.urlchip{display:inline-flex;align-items:center;gap:6px;max-width:100%;
+  background:var(--g100);color:var(--a-sub);
+  font-size:12.5px;padding:5px 8px 5px 10px;border-radius:8px}
+.urlchip img.pf{width:15px;height:15px;object-fit:contain;flex-shrink:0}
+.urlchip b{font-weight:600;color:var(--a-body);flex-shrink:0}
+.urlchip .u{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ───── 썸네일 후보 ───── */
+.thumbpick{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));
+  gap:10px;margin-top:12px}
+.thumbpick:empty{margin-top:0}
+.tcard{position:relative;border:2px solid var(--a-line);border-radius:var(--a-radius);
+  overflow:hidden;background:var(--a-surface);cursor:pointer;transition:.15s;
+  padding:0;text-align:left;width:100%}
+.tcard:hover{border-color:var(--a-line-strong)}
+.tcard.on{border-color:var(--a-primary);box-shadow:var(--a-focus)}
+.tcard:focus-visible{outline:2px solid var(--a-primary);outline-offset:2px}
+.tcard>img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:var(--g100)}
+.tcard .src{display:flex;align-items:center;gap:5px;padding:7px 9px;
+  font-size:11.5px;color:var(--a-sub);line-height:1.3}
+.tcard .src img{width:13px;height:13px;object-fit:contain;flex-shrink:0}
+.tcard .src span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tcard .ck{position:absolute;top:7px;right:7px;width:21px;height:21px;border-radius:50%;
+  background:var(--a-primary);color:#fff;font-size:12px;line-height:21px;
+  text-align:center;display:none}
+.tcard.on .ck{display:block}
+
+/* ───── 프로필 사진 ───── */
+.profgrid{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start}
+.profcol{width:240px}
+.pcap{font-size:12.5px;font-weight:600;color:var(--a-sub);margin-bottom:8px}
+/* 저장되는 비율(720×1000)과 똑같은 틀 — 여기 보이는 대로 잘립니다 */
+.pframe{position:relative;aspect-ratio:72/100;border-radius:var(--a-radius);
+  overflow:hidden;background:var(--g100);display:grid;place-items:center}
+.pframe img{width:100%;height:100%;object-fit:cover;display:block}
+.pframe .ph{font-size:48px;opacity:.45}
+/* '바꿀 사진' 칸은 그대로 끌어다 놓는 자리이기도 합니다 */
+.pframe.drop{background:var(--a-surface);padding:0;font-size:12.5px;line-height:1.6}
+.pframe.drop .big{font-size:26px;display:block;margin-bottom:4px}
+/* 사진을 올린 뒤에는 끌어서 위치를 잡는 편집 상태가 됩니다 */
+.pframe.editing{border-style:solid;border-color:var(--a-line);
+  background:var(--g100);cursor:grab;touch-action:none}
+.pframe.editing:hover{border-color:var(--a-line-strong)}
+.pframe.editing.grabbing{cursor:grabbing}
+.pframe #pNewImg{position:absolute;max-width:none;object-fit:fill;
+  user-select:none;-webkit-user-drag:none}
+
+.pzoom{display:flex;align-items:center;gap:6px;margin-top:10px;flex-wrap:wrap}
+.pzoom input[type=range]{flex:1;min-width:70px;accent-color:var(--a-primary);
+  cursor:pointer;margin:0}
+.pzoom .zbtn{border:none;background:var(--g100);color:var(--a-sub);font-size:12px;
+  font-weight:600;padding:6px 9px;border-radius:8px;cursor:pointer;
+  font-family:var(--a-font);letter-spacing:-.02em;transition:.15s}
+.pzoom .zbtn:hover{background:var(--g200);color:var(--a-body)}
+
+.pnote{font-size:12.5px;color:var(--a-sub);line-height:1.8;
+  max-width:230px;padding-top:26px}
+.pnote b{font-weight:600;color:var(--a-body)}
+@media(max-width:640px){
+  .profcol{width:calc(50% - 10px)}
+  .pnote{max-width:none;padding-top:4px}
+}
+
+/* ───── 목록 ───── */
+.list{display:flex;flex-direction:column;gap:8px}
+.item{background:var(--a-surface);border:1px solid transparent;border-radius:14px;
+  padding:14px 16px;display:flex;gap:14px;align-items:flex-start;
+  box-shadow:var(--a-shadow);transition:.15s}
+.item:hover{border-color:var(--a-line)}
+.item.dragging{opacity:.4}
+.item.editing{border-color:var(--a-primary);box-shadow:var(--a-focus)}
+.item.overtop{border-top:3px solid var(--a-primary)}
+.itembtns{display:flex;flex-direction:column;gap:6px;flex-shrink:0;width:88px;align-items:stretch}
+.grip{cursor:grab;flex-shrink:0;width:16px;height:30px;align-self:center;
+  display:grid;grid-template-columns:repeat(2,3px);grid-template-rows:repeat(3,3px);
+  gap:3px;align-content:center;justify-content:center;opacity:.6;transition:.15s}
+.grip i{display:block;width:3px;height:3px;border-radius:50%;background:var(--a-faint)}
+.grip:hover{opacity:1}
+.grip:hover i{background:var(--a-sub)}
+.grip:active{cursor:grabbing}
+.item .thumb64{width:56px;height:70px;border-radius:8px;object-fit:cover;
+  flex-shrink:0;background:var(--g100)}
+/* 방송 목록 썸네일 — 140×80 고정, 이미지는 가운데를 기준으로 잘립니다 */
+.item .thumb-wide{width:140px;height:80px;flex-shrink:0;border-radius:8px;
+  object-fit:cover;object-position:center;background:var(--g100)}
+@media(max-width:640px){ .item .thumb-wide{width:112px;height:64px} }
+.item .body{flex:1;min-width:0}
+.item .t{font-size:15px;font-weight:600;color:var(--a-ink);margin-bottom:2px}
+.item .m{font-size:13px;color:var(--a-sub);font-variant-numeric:tabular-nums}
+.item .msg{font-size:14px;color:var(--a-body);margin-top:7px;
+  white-space:pre-wrap;word-break:break-word}
+.item .tag{display:inline-block;background:var(--g100);color:var(--a-sub);
+  font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:6px;margin:0 5px 4px 0}
+.item.done{opacity:.5}
+.item.done .t{text-decoration:line-through;font-weight:500}
+.copyable{color:var(--a-primary-ink);font-weight:500;cursor:pointer;
+  border-bottom:1px dashed var(--a-primary);padding-bottom:1px}
+.copyable:hover{background:var(--a-primary-soft);border-radius:4px}
+.donebadge{display:inline-block;background:var(--g100);color:var(--a-sub);
+  font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;margin-left:6px}
+.chk{display:flex;align-items:center;justify-content:center;gap:6px;font-size:12.5px;
+  color:var(--a-sub);white-space:nowrap;height:32px;cursor:pointer;user-select:none}
+.chk input{width:15px;height:15px;accent-color:var(--a-primary);cursor:pointer;margin:0}
+.empty2{text-align:center;color:var(--a-faint);padding:44px 0;font-size:14px}
+
+/* ───── 검색 ───── */
+.isearch{position:relative;margin-bottom:14px}
+.isearch input{width:100%;border:1px solid var(--a-line);border-radius:var(--a-radius);
+  background:var(--a-surface);padding:11px 14px 11px 40px;font-size:14px;
+  color:var(--a-ink);outline:none;transition:.15s}
+.isearch input:hover{border-color:var(--a-line-strong)}
+.isearch input:focus{border-color:var(--a-primary);box-shadow:var(--a-focus)}
+.isearch .si{position:absolute;left:15px;top:50%;transform:translateY(-50%);
+  color:var(--a-faint);font-size:14px;pointer-events:none}
+mark{background:#fff3c4;color:var(--a-ink);border-radius:3px;padding:0 2px}
+
+/* ───── 토스트 ───── */
+.toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(20px);
+  background:var(--g900);color:#fff;padding:12px 22px;border-radius:var(--a-radius);
+  font-size:14px;font-weight:500;opacity:0;pointer-events:none;transition:.25s;z-index:80}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 
 /* ───── 로그인 ───── */
-async function doLogin(){
-  var t=document.getElementById('tok').value.trim();
-  var s=document.getElementById('loginStat');
-  if(!t){ s.textContent='토큰을 입력해 주세요'; return; }
-  s.textContent='확인 중…';
-  try{
-    localStorage.setItem('adminToken', t);
-    var r=await fetch(API+'/auth',{method:'POST',headers:{'X-Admin-Token':t}});
-    if(!r.ok) throw new Error();
-    enterApp();
-  }catch(e){
-    localStorage.removeItem('adminToken');
-    s.textContent='토큰이 맞지 않아요';
-  }
+.login{max-width:360px;margin:80px auto;background:var(--a-surface);
+  border-radius:var(--a-radius-lg);padding:36px 30px;box-shadow:var(--a-shadow);text-align:center}
+.login h2{font-size:20px;font-weight:700;color:var(--a-ink);
+  margin-bottom:6px;letter-spacing:-.03em}
+.login p{font-size:13.5px;color:var(--a-sub);margin-bottom:20px}
+.login input{width:100%;border:1px solid var(--a-line);border-radius:var(--a-radius);
+  padding:12px 14px;font-size:14px;background:var(--a-surface);color:var(--a-ink);
+  outline:none;margin-bottom:12px;text-align:center;transition:.15s}
+.login input:hover{border-color:var(--a-line-strong)}
+.login input:focus{border-color:var(--a-primary);box-shadow:var(--a-focus)}
+
+/* ───── 반응형 · 접근성 ───── */
+@media(max-width:640px){ .frow{grid-template-columns:1fr;gap:4px} .frow.ftop label{padding-top:0} }
+@media(prefers-reduced-motion:reduce){
+  .tabs button,.btn,.tcard,.item,.toast,.drop,.frow input,.frow textarea{transition:none}
 }
-function doLogout(){ localStorage.removeItem('adminToken'); location.reload(); }
-function enterApp(){
-  document.getElementById('login').style.display='none';
-  document.getElementById('app').style.display='block';
-  setToday();
-  loadGallery(); loadBroadcast(); loadInquiry(); loadProfile();
-}
-(function(){ if(DB.token()) fetch(API+'/auth',{method:'POST',headers:{'X-Admin-Token':DB.token()}})
-  .then(function(r){ if(r.ok) enterApp(); }); })();
-
-function tab(n){
-  document.querySelectorAll('.tabs button').forEach(function(b){ b.classList.toggle('on', b.dataset.t===n); });
-  document.querySelectorAll('.panel').forEach(function(p){ p.classList.toggle('on', p.id==='p-'+n); });
-}
-
-/* 방송일 기본값 = 페이지를 연 지금 시각 */
-function setToday(){
-  var d=new Date(), p=function(n){return('0'+n).slice(-2);};
-  document.getElementById('bDate').value =
-    d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes());
-}
-
-/* D1의 created_at 은 UTC — 화면엔 한국 시간으로 */
-function kst(s){
-  if(!s) return '';
-  var str=String(s).trim().replace(' ','T');
-  if(!/[zZ]$|[+\-]\d{2}:?\d{2}$/.test(str)) str+='Z';
-  var d=new Date(str);
-  if(isNaN(d)) return String(s).slice(0,16);
-  return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',
-    year:'numeric',month:'2-digit',day:'2-digit',
-    hour:'2-digit',minute:'2-digit',hour12:false}).format(d).replace(',','');
-}
-
-/* ───── 업로드 공통 ───── */
-function bindDrop(dropEl, fileEl, onDone){
-  dropEl.addEventListener('click',function(){ fileEl.click(); });
-  dropEl.addEventListener('dragover',function(e){ e.preventDefault(); dropEl.classList.add('over'); });
-  dropEl.addEventListener('dragleave',function(){ dropEl.classList.remove('over'); });
-  dropEl.addEventListener('drop',function(e){
-    e.preventDefault(); dropEl.classList.remove('over');
-    if(e.dataTransfer.files[0]) go(e.dataTransfer.files[0]);
-  });
-  fileEl.addEventListener('change',function(){ if(fileEl.files[0]) go(fileEl.files[0]); });
-  async function go(f){
-    toast('업로드 중…');
-    try{ var res=await DB.upload(f); onDone(res.url); toast('사진이 올라갔어요'); }
-    catch(e){ toast('업로드 실패 ㅠㅠ'); }
-  }
-}
-
-/* ───── 화보 ───── */
-var gUrl='';
-bindDrop(document.getElementById('drop'), document.getElementById('file'), function(url){
-  gUrl=url;
-  document.getElementById('prevImg').src=url;
-  document.getElementById('prev').style.display='block';
-});
-
-var gEditId=null;
-
-function cancelGallery(){
-  gEditId=null; gUrl='';
-  document.getElementById('gTitle').value='';
-  document.getElementById('gDesc').value='';
-  document.getElementById('prev').style.display='none';
-  document.getElementById('gHead').textContent='월간쿠룽 등록';
-  document.getElementById('gSubmit').textContent='등록하기';
-  document.getElementById('gCancel').style.display='none';
-  document.getElementById('gStat').textContent='';
-  loadGallery();
-}
-
-function editGallery(id){
-  var g=GAL.filter(function(x){return x.id===id;})[0]; if(!g) return;
-  gEditId=id; gUrl=g.image_url||'';
-  document.getElementById('gTitle').value=g.title||'';
-  document.getElementById('gDesc').value=g.description||'';
-  if(gUrl){ document.getElementById('prevImg').src=gUrl;
-            document.getElementById('prev').style.display='block'; }
-  document.getElementById('gHead').textContent='월간쿠룽 수정';
-  document.getElementById('gSubmit').textContent='수정 완료';
-  document.getElementById('gCancel').style.display='inline-block';
-  loadGallery();
-  window.scrollTo({top:0,behavior:'smooth'});
-}
-
-async function saveGallery(){
-  var s=document.getElementById('gStat');
-  if(!gUrl){ s.textContent='먼저 사진을 올려주세요'; return; }
-  var t=document.getElementById('gTitle').value.trim();
-  if(!t){ s.textContent='제목을 입력해 주세요'; return; }
-  s.textContent='저장 중…';
-  var row={ title:t, description:document.getElementById('gDesc').value.trim(),
-            image_url:gUrl, sort_order:0 };
-  try{
-    if(gEditId){
-      var cur=GAL.filter(function(x){return x.id===gEditId;})[0];
-      row.sort_order = cur?(cur.sort_order||0):0;
-      await DB.update('gallery',gEditId,row);
-      toast('수정됐어요 ✏️');
-    }else{
-      await DB.insert('gallery',row);
-      toast('등록됐어요 🎉');
-    }
-    cancelGallery();
-    loadGallery();
-  }catch(e){ s.textContent='저장 실패: '+(e.message||'알 수 없는 오류'); console.error(e); }
-}
-
-var GAL=[];
-async function loadGallery(){
-  var box=document.getElementById('gList');
-  try{
-    GAL=await DB.list('gallery');
-    if(!GAL.length){ box.innerHTML='<div class="empty2">등록된 화보가 없어요</div>'; return; }
-    box.innerHTML=GAL.map(function(g,i){
-      return '<div class="item'+(gEditId===g.id?' editing':'')+'" draggable="true" data-i="'+i+'">'+
-        '<span class="grip" title="끌어서 순서 바꾸기"><i></i><i></i><i></i><i></i><i></i><i></i></span>'+
-        (g.image_url?'<img class="thumb64" src="'+esc(g.image_url)+'" alt="">':'<div class="thumb64"></div>')+
-        '<div class="body"><div class="t">'+esc(g.title)+'</div>'+
-        '<div class="m">'+esc(kst(g.created_at))+'</div>'+
-        (g.description?'<div class="msg">'+esc(g.description)+'</div>':'')+'</div>'+
-        '<div class="itembtns">'+
-        '<button class="btn edit" onclick="editGallery('+g.id+')">수정</button>'+
-        '<button class="btn del" onclick="delItem(\'gallery\','+g.id+')">삭제</button></div></div>';
-    }).join('');
-    bindDrag('#gList', GAL, saveGalleryOrder);
-  }catch(e){ box.innerHTML='<div class="empty2">불러오기 실패</div>'; }
-}
-
-/* 드래그로 순서 바꾸기 (공통) */
-var dragI=null;
-function bindDrag(sel, arr, onSave){
-  var items=document.querySelectorAll(sel+' .item');
-  items.forEach(function(el){
-    el.addEventListener('dragstart',function(){ dragI=+el.dataset.i; el.classList.add('dragging'); });
-    el.addEventListener('dragend',function(){ el.classList.remove('dragging');
-      items.forEach(function(x){x.classList.remove('overtop');}); });
-    el.addEventListener('dragover',function(e){ e.preventDefault(); el.classList.add('overtop'); });
-    el.addEventListener('dragleave',function(){ el.classList.remove('overtop'); });
-    el.addEventListener('drop',async function(e){
-      e.preventDefault();
-      var to=+el.dataset.i;
-      if(dragI===null||dragI===to) return;
-      var moved=arr.splice(dragI,1)[0];
-      arr.splice(to,0,moved);
-      dragI=null;
-      await onSave();
-    });
-  });
-}
-
-async function saveGalleryOrder(){
-  toast('순서 저장 중…');
-  try{
-    for(var i=0;i<GAL.length;i++){
-      var g=GAL[i];
-      if(g.sort_order!==i){
-        await DB.update('gallery',g.id,{title:g.title,description:g.description,
-          image_url:g.image_url,sort_order:i});
-        g.sort_order=i;
-      }
-    }
-    toast('순서가 바뀌었어요');
-    loadGallery();
-  }catch(e){ toast('순서 저장 실패: '+(e.message||'')); console.error(e); }
-}
-
-/* ───── 방송 ───── */
-var bUrl='';          /* 최종 선택된 썸네일 주소 */
-var bEditId=null;
-var TAGS=[];
-
-function renderChips(){
-  document.getElementById('bChips').innerHTML = TAGS.map(function(t,i){
-    return '<span class="chip"><b>#'+esc(t)+'</b><button onclick="removeTag('+i+')">×</button></span>';
-  }).join('');
-}
-function addTag(v){
-  v=String(v||'').trim().replace(/^#/,'');
-  if(!v) return;
-  v.split(',').forEach(function(x){
-    x=x.trim().replace(/^#/,'');
-    if(x && TAGS.indexOf(x)<0) TAGS.push(x);
-  });
-  renderChips();
-}
-function removeTag(i){ TAGS.splice(i,1); renderChips(); }
-(function(){
-  var el=document.getElementById('bTagInput');
-  el.addEventListener('keydown',function(e){
-    if(e.key==='Enter'||e.key===','){ e.preventDefault(); addTag(el.value); el.value=''; }
-    else if(e.key==='Backspace' && !el.value && TAGS.length){ TAGS.pop(); renderChips(); }
-  });
-  el.addEventListener('blur',function(){ if(el.value.trim()){ addTag(el.value); el.value=''; } });
-})();
-
-/* ═════════ 영상 주소 (플랫폼 자동 구분) ═════════ */
-
-/* config.js 의 broadcast.platforms 를 기준으로 삼고,
-   주소를 알아보는 규칙만 여기서 보강합니다.
-   config 쪽 platforms 항목에 match:'정규식' 을 넣으면 그 값이 우선합니다. */
-var PLATFORMS = (function(){
-  var known = {
-    youtube_url: { key:'youtube', label:'유튜브', icon:'youtube.png',
-                   re:/(?:^|\.)(?:youtube\.com|youtube-nocookie\.com|youtu\.be)$/i },
-    soop_url   : { key:'soop',    label:'숲',    icon:'soop.png',
-                   re:/(?:^|\.)(?:sooplive\.co\.kr|sooplive\.com|afreecatv\.com)$/i }
-  };
-  var out = ((CFG.broadcast&&CFG.broadcast.platforms)||[]).map(function(p){
-    var k = known[p.field] || {};
-    return {
-      field: p.field,
-      key  : k.key || String(p.field).replace(/_url$/,''),
-      label: p.label || k.label || p.field,
-      icon : p.icon  || k.icon  || '🔗',
-      re   : p.match ? new RegExp(p.match,'i') : (k.re||null)
-    };
-  });
-  /* config 에 빠진 플랫폼이 있어도 주소는 인식되게 */
-  Object.keys(known).forEach(function(f){
-    for(var i=0;i<out.length;i++) if(out[i].field===f) return;
-    var k=known[f];
-    out.push({ field:f, key:k.key, label:k.label, icon:k.icon, re:k.re });
-  });
-  return out;
-})();
-
-var URLS = {};   /* { soop_url:'…', youtube_url:'…' } */
-
-function pfByField(f){
-  for(var i=0;i<PLATFORMS.length;i++) if(PLATFORMS[i].field===f) return PLATFORMS[i];
-  return null;
-}
-function pfIcon(p, cls){
-  return /\.(png|jpg|jpeg|svg|webp|gif)$/i.test(p.icon||'')
-    ? '<img class="'+cls+'" src="'+esc(p.icon)+'" alt="">'
-    : '<span class="'+cls+'">'+esc(p.icon||'🔗')+'</span>';
-}
-function normUrl(v){
-  v=String(v||'').trim().replace(/^["'<]+|[>"']+$/g,'');
-  if(!v) return '';
-  if(!/^https?:\/\//i.test(v)) v='https://'+v.replace(/^\/+/,'');
-  return v;
-}
-function hostOf(url){
-  try{ return new URL(url).hostname.replace(/^www\./i,''); }catch(e){ return ''; }
-}
-/* 주소를 보고 어느 플랫폼인지 판별 */
-function detectField(url){
-  var host=hostOf(url); if(!host) return '';
-  for(var i=0;i<PLATFORMS.length;i++){
-    var p=PLATFORMS[i];
-    if(p.re && p.re.test(host)) return p.field;
-  }
-  return '';
-}
-function shortUrl(u){
-  var s=String(u).replace(/^https?:\/\//i,'').replace(/^www\./i,'').replace(/\/$/,'');
-  return s.length>44 ? s.slice(0,42)+'…' : s;
-}
-
-function renderUrlChips(){
-  document.getElementById('bUrlChips').innerHTML = PLATFORMS.map(function(p){
-    var u=URLS[p.field]; if(!u) return '';
-    return '<span class="urlchip '+esc(p.key)+'" title="'+esc(u)+'">'+
-      pfIcon(p,'pf')+'<b>'+esc(p.label)+'</b>'+
-      '<span class="u">'+esc(shortUrl(u))+'</span>'+
-      '<button type="button" aria-label="'+esc(p.label)+' 주소 지우기" '+
-      'onclick="removeUrl(\''+esc(p.field)+'\')">×</button></span>';
-  }).join('');
-}
-
-function addUrl(v){
-  var st=document.getElementById('bStat');
-  var u=normUrl(v); if(!u) return;
-  var f=detectField(u);
-  if(!f){
-    st.textContent='알 수 없는 주소예요 — 숲 또는 유튜브 영상 주소를 넣어주세요';
-    return;
-  }
-  st.textContent='';
-  var p=pfByField(f), had=!!URLS[f];
-  if(had && URLS[f]===u){ toast(p.label+' 주소는 이미 들어가 있어요'); return; }
-  URLS[f]=u;
-  renderUrlChips();
-  toast(had ? (p.label+' 주소를 바꿨어요') : (p.label+' 주소를 넣었어요'));
-  refreshThumbs(false);
-}
-
-function removeUrl(f){
-  if(!URLS[f]) return;
-  delete URLS[f];
-  renderUrlChips();
-  CAND = CAND.filter(function(c){ return c.field!==f; });
-  renderThumbPick();
-  if(!aliveHas(bUrl)) selectFirstAlive();
-}
-
-(function(){
-  var el=document.getElementById('bUrlInput');
-  el.addEventListener('keydown',function(e){
-    if(e.key==='Enter'){ e.preventDefault(); addUrl(el.value); el.value=''; }
-    else if(e.key==='Backspace' && !el.value){
-      for(var i=PLATFORMS.length-1;i>=0;i--){
-        if(URLS[PLATFORMS[i].field]){ removeUrl(PLATFORMS[i].field); break; }
-      }
-    }
-  });
-  el.addEventListener('blur',function(){
-    if(el.value.trim()){ addUrl(el.value); el.value=''; }
-  });
-})();
-
-/* ═════════ 썸네일 후보 고르기 ═════════ */
-/* CAND 항목: { src, field, label, icon, note, dead } */
-var CAND=[];
-
-function ytId(url){
-  var m=String(url||'').match(
-    /(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:watch\?v=|live\/|embed\/|v\/|shorts\/))([A-Za-z0-9_-]{11})/);
-  return m?m[1]:'';
-}
-
-function addCand(c){
-  if(!c.src) return;
-  for(var i=0;i<CAND.length;i++) if(CAND[i].src===c.src) return;
-  CAND.push(c);
-}
-function aliveHas(src){
-  if(!src) return false;
-  for(var i=0;i<CAND.length;i++) if(CAND[i].src===src && !CAND[i].dead) return true;
-  return false;
-}
-
-function renderThumbPick(){
-  var box=document.getElementById('bThumbs');
-  box.innerHTML = CAND.map(function(c,i){
-    var p = c.icon
-      ? (/\.(png|jpg|jpeg|svg|webp|gif)$/i.test(c.icon)
-          ? '<img src="'+esc(c.icon)+'" alt="">' : '<span>'+esc(c.icon)+'</span>')
-      : '';
-    return '<button type="button" class="tcard'+(c.src===bUrl?' on':'')+'"'+
-      (c.dead?' style="display:none"':'')+' data-i="'+i+'" title="'+esc(c.src)+'">'+
-      '<span class="ck">✓</span>'+
-      '<img src="'+esc(c.src)+'" alt="" '+
-        'onload="thumbLoaded(this)" onerror="thumbFailed(this)">'+
-      '<span class="src">'+p+'<span>'+esc(c.label)+(c.note?' · '+esc(c.note):'')+'</span></span>'+
-      '</button>';
-  }).join('');
-  Array.prototype.forEach.call(box.querySelectorAll('.tcard'),function(el){
-    el.addEventListener('click',function(){ pickThumb(+el.getAttribute('data-i')); });
-  });
-  updateThumbHint();
-}
-
-function cardOf(img){
-  var el=img.parentNode;
-  while(el && (!el.classList || !el.classList.contains('tcard'))) el=el.parentNode;
-  return el;
-}
-/* 유튜브는 없는 화질을 요청하면 120×90 회색 이미지를 주기도 해서 걸러냅니다 */
-function thumbLoaded(img){
-  if(img.naturalWidth<=120 && img.naturalHeight<=90) thumbFailed(img);
-}
-function thumbFailed(img){
-  var card=cardOf(img); if(!card) return;
-  var i=+card.getAttribute('data-i'), c=CAND[i];
-  /* 다음 화질이 남아 있으면 그걸로 갈아끼웁니다 */
-  if(c && c.alts && c.alts.length){
-    var wasSel=(c.src===bUrl);
-    c.src=c.alts.shift();
-    card.setAttribute('title',c.src);
-    if(wasSel) bUrl=c.src;
-    img.src=c.src;
-    return;
-  }
-  if(c) c.dead=true;
-  card.style.display='none';
-  card.classList.remove('on');
-  if(CAND[i] && CAND[i].src===bUrl){ bUrl=''; selectFirstAlive(); }
-  updateThumbHint();
-}
-
-function pickThumb(i){
-  var c=CAND[i]; if(!c || c.dead) return;
-  bUrl=c.src;
-  markSelection();
-  document.getElementById('bStat').textContent='';
-}
-function selectFirstAlive(){
-  for(var i=0;i<CAND.length;i++) if(!CAND[i].dead){ pickThumb(i); return; }
-  bUrl=''; markSelection();
-}
-function markSelection(){
-  Array.prototype.forEach.call(
-    document.getElementById('bThumbs').querySelectorAll('.tcard'),function(el){
-      var c=CAND[+el.getAttribute('data-i')];
-      el.classList.toggle('on', !!c && c.src===bUrl);
-    });
-}
-function updateThumbHint(){
-  var hint=document.getElementById('bThumbHint');
-  if(!hint) return;                      /* 안내 문구를 지워도 동작하도록 */
-  var alive=0, i;
-  for(i=0;i<CAND.length;i++) if(!CAND[i].dead) alive++;
-  /* 주소는 넣었는데 가져온 썸네일이 하나도 없을 때만 알려줍니다 */
-  if(alive || !Object.keys(URLS).length){ hint.style.display='none'; return; }
-  hint.style.display='block';
-  hint.textContent='가져온 썸네일이 없어요 — 직접 올려주세요';
-}
-
-/* 플랫폼별로 방식이 달라서 따로 처리합니다.
-   · 유튜브 → 주소에서 영상 ID를 뽑아 화질별로 바로 (서버 요청 없음)
-   · 숲 등  → 서버(/api/ogimage)가 페이지의 미리보기 이미지를 읽어옴 */
-async function fetchOg(url, p){
-  try{
-    var r=await fetch(API+'/ogimage?url='+encodeURIComponent(url),{headers:DB.headers(false)});
-    var j={}; try{ j=await r.json(); }catch(_){}
-    if(!r.ok || !j.image){
-      console.warn('[ogimage]', p.field, r.status, j);
-      return { ok:false, label:p.label, msg:(j.error||('HTTP '+r.status)) };
-    }
-    addCand({ src:j.image, field:p.field, label:p.label, icon:p.icon, note:'' });
-    return { ok:true };
-  }catch(e){
-    console.error(e);
-    return { ok:false, label:p.label, msg:(e.message||'네트워크 오류') };
-  }
-}
-
-async function refreshThumbs(manual){
-  var st=document.getElementById('bStat');
-  var fields=Object.keys(URLS);
-
-  if(!fields.length){
-    if(manual) st.textContent='먼저 영상 주소를 입력해 주세요';
-    CAND=CAND.filter(function(c){ return c.field==='upload'||c.field==='saved'; });
-    renderThumbPick();
-    if(!aliveHas(bUrl)) selectFirstAlive();
-    return;
-  }
-  if(manual) st.textContent='썸네일 가져오는 중…';
-
-  /* 직접 올린 사진과 기존 썸네일은 남기고, 주소에서 온 후보만 다시 만듭니다 */
-  CAND=CAND.filter(function(c){ return c.field==='upload'||c.field==='saved'; });
-
-  var jobs=[];
-  PLATFORMS.forEach(function(p){
-    var u=URLS[p.field]; if(!u) return;
-    var id=ytId(u);
-    if(id){
-      /* 가장 좋은 화질부터 시도하고, 없으면 아래 화질로 자동으로 내려갑니다 */
-      var vi='https://img.youtube.com/vi/'+id+'/';
-      addCand({ src:vi+'maxresdefault.jpg',
-                alts:[vi+'sddefault.jpg', vi+'hqdefault.jpg'],
-                field:p.field, label:p.label, icon:p.icon, note:'' });
-    }else{
-      jobs.push(fetchOg(u,p));
-    }
-  });
-
-  renderThumbPick();
-  if(!aliveHas(bUrl)) selectFirstAlive();
-
-  if(!jobs.length){ if(manual) st.textContent=''; return; }
-
-  var res=await Promise.all(jobs);
-  renderThumbPick();
-  if(!aliveHas(bUrl)) selectFirstAlive();
-
-  var fails=res.filter(function(x){ return x && !x.ok; });
-  if(manual){
-    st.textContent = fails.length
-      ? fails.map(function(f){ return f.label+' 실패: '+f.msg; }).join(' / ')
-      : '';
-    if(!fails.length) toast('썸네일 후보를 가져왔어요');
-  }else if(fails.length && !aliveHas(bUrl)){
-    toast('썸네일을 못 가져왔어요 — 직접 올려주세요');
-  }
-}
-
-/* 직접 올린 사진도 후보 목록에 넣고 바로 선택 */
-bindDrop(document.getElementById('bDrop'), document.getElementById('bFile'), function(url){
-  addCand({ src:url, field:'upload', label:'직접 올린 사진', icon:'🖼', note:'' });
-  renderThumbPick();
-  for(var i=0;i<CAND.length;i++) if(CAND[i].src===url){ pickThumb(i); break; }
-});
-
-function cancelBroadcast(){
-  bEditId=null; bUrl='';
-  ['bTitle','bTagInput','bUrlInput'].forEach(function(id){ document.getElementById(id).value=''; });
-  TAGS=[]; renderChips();
-  URLS={}; renderUrlChips();
-  CAND=[]; renderThumbPick();
-  document.getElementById('bHead').textContent='방송 히스토리 등록';
-  document.getElementById('bSubmit').textContent='등록하기';
-  document.getElementById('bCancel').style.display='none';
-  document.getElementById('bStat').textContent='';
-  setToday();
-}
-
-function editBroadcast(id){
-  var b=BC.filter(function(x){return x.id===id;})[0]; if(!b) return;
-  bEditId=id; bUrl=b.thumbnail_url||'';
-  document.getElementById('bTitle').value=b.title||'';
-  document.getElementById('bDate').value=(b.broadcast_date||'').slice(0,16);
-  TAGS=String(b.tags||'').split(',').map(function(x){return x.trim();}).filter(Boolean); renderChips();
-  document.getElementById('bUrlInput').value='';
-
-  URLS={};
-  PLATFORMS.forEach(function(p){
-    var v=String(b[p.field]||'').trim();
-    if(v) URLS[p.field]=v;
-  });
-  renderUrlChips();
-
-  CAND=[];
-  if(bUrl) addCand({ src:bUrl, field:'saved', label:'지금 쓰는 썸네일', icon:'⭐', note:'' });
-  renderThumbPick();
-  refreshThumbs(false);
-
-  document.getElementById('bHead').textContent='방송 히스토리 수정';
-  document.getElementById('bSubmit').textContent='수정 완료';
-  document.getElementById('bCancel').style.display='inline-block';
-  window.scrollTo({top:0,behavior:'smooth'});
-}
-
-async function saveBroadcast(){
-  var s=document.getElementById('bStat');
-  var t=document.getElementById('bTitle').value.trim();
-  if(!t){ s.textContent='제목을 입력해 주세요'; return; }
-  s.textContent='저장 중…';
-  var row={
-    title:t,
-    broadcast_date:document.getElementById('bDate').value||'',
-    tags:TAGS.join(', '),
-    soop_url:'', youtube_url:'',
-    thumbnail_url:bUrl, sort_order:0
-  };
-  PLATFORMS.forEach(function(p){ row[p.field]=URLS[p.field]||''; });
-  try{
-    if(bEditId){
-      var cur=BC.filter(function(x){return x.id===bEditId;})[0];
-      row.sort_order = cur?(cur.sort_order||0):0;
-      await DB.update('broadcasts',bEditId,row);
-      toast('수정됐어요 ✏️');
-    }else{
-      await DB.insert('broadcasts',row);
-      toast('등록됐어요 🎉');
-    }
-    cancelBroadcast();
-    loadBroadcast();
-  }catch(e){ s.textContent='저장 실패: '+(e.message||'알 수 없는 오류'); console.error(e); }
-}
-
-/* 유튜브 자동 썸네일 */
-function ytThumb(url){
-  if(!url) return '';
-  var m=String(url).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|live\/|embed\/|v\/|shorts\/))([A-Za-z0-9_-]{11})/);
-  return m?('https://img.youtube.com/vi/'+m[1]+'/hqdefault.jpg'):'';
-}
-
-var BC=[];
-async function loadBroadcast(){
-  var box=document.getElementById('bList');
-  try{
-    BC=await DB.list('broadcasts');
-    if(!BC.length){ box.innerHTML='<div class="empty2">등록된 방송이 없어요</div>'; return; }
-    box.innerHTML=BC.map(function(b,i){
-      var tags=String(b.tags||'').split(',').map(function(x){return x.trim();}).filter(Boolean)
-        .map(function(x){return '<span class="tag">#'+esc(x)+'</span>';}).join('');
-      var thumb=(b.thumbnail_url&&b.thumbnail_url.trim())||ytThumb(b.youtube_url);
-      var th=thumb
-        ? '<img class="thumb-wide" src="'+esc(thumb)+'" alt="">'
-        : '<div class="thumb-wide"></div>';
-      return '<div class="item'+(bEditId===b.id?' editing':'')+'" draggable="true" data-i="'+i+'">'+
-        '<span class="grip" title="끌어서 순서 바꾸기"><i></i><i></i><i></i><i></i><i></i><i></i></span>'+th+
-        '<div class="body"><div class="t">'+esc(b.title)+'</div>'+
-        '<div class="m">'+esc(String(b.broadcast_date||'').replace('T',' '))+'</div>'+
-        (tags?'<div style="margin-top:6px">'+tags+'</div>':'')+
-        '</div><div class="itembtns">'+
-        '<button class="btn edit" onclick="editBroadcast('+b.id+')">수정</button>'+
-        '<button class="btn del" onclick="delItem(\'broadcasts\','+b.id+')">삭제</button></div></div>';
-    }).join('');
-    bindDrag('#bList', BC, saveBroadcastOrder);
-  }catch(e){ box.innerHTML='<div class="empty2">불러오기 실패</div>'; }
-}
-
-async function saveBroadcastOrder(){
-  toast('순서 저장 중…');
-  try{
-    for(var i=0;i<BC.length;i++){
-      var b=BC[i];
-      if(b.sort_order!==i){
-        await DB.update('broadcasts',b.id,{
-          title:b.title, broadcast_date:b.broadcast_date, tags:b.tags,
-          soop_url:b.soop_url, youtube_url:b.youtube_url,
-          thumbnail_url:b.thumbnail_url, sort_order:i});
-        b.sort_order=i;
-      }
-    }
-    toast('순서가 바뀌었어요');
-    loadBroadcast();
-  }catch(e){ toast('순서 저장 실패: '+(e.message||'')); console.error(e); }
-}
-
-/* ───── 문의 ───── */
-var INQ=[];
-
-function hl(text, q){
-  var e=esc(text);
-  if(!q) return e;
-  var rx=new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
-  return e.replace(rx,'<mark>$1</mark>');
-}
-
-async function loadInquiry(){
-  try{ INQ=await DB.list('inquiries'); }
-  catch(e){ document.getElementById('iList').innerHTML='<div class="empty2">불러오기 실패</div>'; return; }
-  renderInquiry();
-}
-
-function renderInquiry(){
-  var box=document.getElementById('iList');
-  var q=(document.getElementById('iq').value||'').trim();
-  var lower=q.toLowerCase();
-  var rows = q ? INQ.filter(function(x){
-    return ((x.nickname||'')+' '+(x.contact||'')+' '+(x.message||'')).toLowerCase().indexOf(lower)>=0;
-  }) : INQ;
-
-  if(!rows.length){
-    box.innerHTML='<div class="empty2">'+(q?'검색 결과가 없어요':'받은 문의가 없어요')+'</div>';
-    return;
-  }
-  box.innerHTML=rows.map(function(x){
-    var isDone = !!(x.done && x.done!=='0');
-    var c=x.contact
-      ? '<span class="copyable" onclick="copyText(this.textContent)">'+hl(x.contact,q)+'</span>'
-      : '<span style="color:var(--a-faint)">연락처 없음</span>';
-    return '<div class="item'+(isDone?' done':'')+'"><div class="body">'+
-      '<div class="t">'+hl(x.nickname,q)+(isDone?'<span class="donebadge">처리완료</span>':'')+'</div>'+
-      '<div class="m">'+esc(kst(x.created_at))+' · '+c+'</div>'+
-      '<div class="msg">'+hl(x.message,q)+'</div>'+
-      '</div><div class="itembtns">'+
-      '<label class="chk"><input type="checkbox" '+(isDone?'checked':'')+
-      ' onchange="toggleDone('+x.id+',this.checked)">처리 완료</label>'+
-      '<button class="btn del" onclick="delItem(\'inquiries\','+x.id+')">삭제</button>'+
-      '</div></div>';
-  }).join('');
-}
-
-async function toggleDone(id, val){
-  try{
-    await DB.update('inquiries', id, { done: val ? 1 : 0 });
-    toast(val ? '처리 완료로 표시했어요' : '미처리로 되돌렸어요');
-    loadInquiry();
-  }catch(e){ toast('변경 실패: '+(e.message||'')); console.error(e); loadInquiry(); }
-}
-
-function copyText(t){
-  if(navigator.clipboard) navigator.clipboard.writeText(t).then(function(){ toast('복사했어요 📋'); });
-  else{
-    var ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta);
-    ta.select(); document.execCommand('copy'); ta.remove(); toast('복사했어요 📋');
-  }
-}
-
-/* ───── 삭제 ───── */
-async function delItem(table,id){
-  if(!confirm('정말 삭제할까요?')) return;
-  try{
-    await DB.remove(table,id);
-    toast('삭제됐어요');
-    if(table==='gallery') loadGallery();
-    else if(table==='broadcasts') loadBroadcast();
-    else loadInquiry();
-  }catch(e){ toast('삭제 실패: '+(e.message||'')); console.error(e); }
-}
-
-/* ───── 프로필 사진 ─────
-   config.js 의 값은 그대로 두고, 관리자에서 바꾼 사진이 있으면
-   그 주소를 settings 에 저장해 덮어씁니다. */
-var pfNow='';   /* 지금 쓰이는 사진 */
-var pfNew='';   /* 새로 올렸지만 아직 저장 전인 사진 */
-
-async function loadProfile(){
-  var fallback=(CFG.profile||{}).image||'';
-  try{
-    var st=await DB.settings();
-    pfNow=(st && st.profile_image) || fallback;
-  }catch(e){ pfNow=fallback; }
-
-  document.getElementById('pNow').innerHTML = pfNow
-    ? '<img src="'+esc(pfNow)+'" alt="">'
-    : '<span class="ph">🧝</span>';
-}
-
-bindDrop(document.getElementById('pDrop'), document.getElementById('pFile'), function(url){
-  pfNew=url;
-  var img=document.getElementById('pNewImg');
-  img.src=url; img.style.display='block';
-  document.getElementById('pHint').style.display='none';
-  document.getElementById('pCancel').style.display='';
-  document.getElementById('pSubmit').disabled=false;
-  document.getElementById('pStat').textContent='아직 저장 전이에요';
-});
-
-function cancelProfile(){
-  pfNew='';
-  var img=document.getElementById('pNewImg');
-  img.style.display='none'; img.src='';
-  document.getElementById('pHint').style.display='';
-  document.getElementById('pCancel').style.display='none';
-  document.getElementById('pSubmit').disabled=true;
-  document.getElementById('pStat').textContent='';
-}
-
-async function saveProfile(){
-  var st=document.getElementById('pStat');
-  if(!pfNew){ st.textContent='먼저 사진을 올려주세요'; return; }
-  var btn=document.getElementById('pSubmit');
-  btn.disabled=true; st.textContent='저장 중…';
-  try{
-    await DB.saveSetting('profile_image', pfNew);
-    cancelProfile();
-    await loadProfile();
-    toast('프로필 사진을 바꿨어요');
-  }catch(e){
-    st.textContent='저장 실패 — 잠시 후 다시 시도해 주세요';
-    btn.disabled=false;
-  }
-}
-</script>
-</body>
-</html>
