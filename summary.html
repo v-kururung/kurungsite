@@ -77,8 +77,9 @@ function card(b){
   var thumb=(b.thumbnail_url&&String(b.thumbnail_url).trim())
     ? String(b.thumbnail_url).trim() : ytThumb(b.youtube_url);
   var img=thumb?'<img src="'+esc(thumb)+'" alt="" onerror="this.style.display=\'none\'">':'';
-  var tags=String(b.tags||'').split(',').map(function(t){return t.trim();}).filter(Boolean)
-           .map(function(t){return '<span>#'+esc(t)+'</span>';}).join('');
+  var tagList=String(b.tags||'').split(',').map(function(t){return t.trim();}).filter(Boolean);
+  var tags=tagList.map(function(t){return '<span>#'+esc(t)+'</span>';}).join('');
+  var tagTip=tagList.length?' title="'+esc(tagList.map(function(t){return '#'+t;}).join(' '))+'"':'';
 
   var links=(B.platforms||[]).map(function(pf){
     var url=(b[pf.field]&&String(b[pf.field]).trim())||'';
@@ -93,9 +94,17 @@ function card(b){
   return '<div class="vcard"><div class="vthumb"><div class="vph">&#127916;</div>'+img+'</div>'+
     '<div class="vbody"><div class="vtitle">'+esc(b.title||'무제')+'</div>'+
     '<div class="vdate">'+fmtDate(b.broadcast_date)+'</div>'+
-    (tags?'<div class="vtags">'+tags+'</div>':'')+
+    '<div class="vtags"'+tagTip+'>'+tags+'</div>'+
     '<div class="vlabel">'+esc(T(B.replayLabel||'다시보기'))+'</div>'+
     '<div class="vlinks">'+links+'</div></div></div>';
+}
+
+function ghostCard(){
+  return '<div class="vcard ghost" aria-hidden="true"><div class="vthumb"></div>'+
+    '<div class="vbody"><div class="vtitle">&nbsp;</div>'+
+    '<div class="vdate">&nbsp;</div><div class="vtags"></div>'+
+    '<div class="vlabel">&nbsp;</div>'+
+    '<div class="vlinks"><a>&nbsp;</a></div></div></div>';
 }
 
 function renderPage(){
@@ -109,7 +118,14 @@ function renderPage(){
     grid.innerHTML='<div class="vempty">'+(q?'검색 결과가 없어요 \uD83C\uDF43':esc(T(B.emptyText||'')))+'</div>';
   }else{
     var s=(page-1)*PER;
-    grid.innerHTML=FILTERED.slice(s,s+PER).map(card).join('');
+    var html=FILTERED.slice(s,s+PER).map(card).join('');
+    /* 페이지가 여러 장일 때는 마지막 장의 빈자리를 투명 카드로 채워서
+       페이지를 넘겨도 페이지 번호 위치가 움직이지 않게 합니다 */
+    if(totalPages>1){
+      var shown=Math.min(PER, total-s);
+      for(var g=shown; g<PER; g++) html+=ghostCard();
+    }
+    grid.innerHTML=html;
   }
   document.getElementById('count').textContent=total?('총 '+total+'개'):'';
   renderPager(totalPages);
