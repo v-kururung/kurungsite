@@ -125,7 +125,11 @@ function renderPager(totalPages){
 }
 function goPage(p){
   page=p; renderPage();
-  document.getElementById('grid').scrollIntoView({behavior:'smooth',block:'start'});
+  /* scrollIntoView 는 iframe 밖(숲 게시글)까지 끌어내리므로 쓰지 않습니다.
+     window.scrollTo 는 이 창 안에서만 움직여서, 임베드에선 아무 일도 없고
+     사이트로 직접 들어온 경우에만 목록 위로 부드럽게 올라갑니다. */
+  var y=document.getElementById('grid').getBoundingClientRect().top+(window.scrollY||0)-84;
+  window.scrollTo({top:Math.max(0,y),behavior:'smooth'});
 }
 function applyFilter(){
   var q=(document.getElementById('q').value||'').trim().toLowerCase();
