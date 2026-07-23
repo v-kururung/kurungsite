@@ -106,14 +106,18 @@ window.SITE_CONFIG = {
     pollMinutes : 60,                    // 자동 새로고침 주기(분)
     sectionTitle: '이번주 일정',
     specialDate : '2026-08-01',          // 특별 강조할 날 (데뷔일 등, 없으면 '')
-    emptyText   : '—'                    // 일정 없는 날 표시
+    emptyText   : '—',                   // 일정 없는 날 표시
+
+    /* 하루에 일정이 여러 개면 첫 일정 + '+N' 배지로 표시됩니다.
+       배지를 눌렀을 때 이동할 일정 페이지 (아직 없으면 '' 로 두세요) */
+    schedulePage: ''
   },
 
 
   /* ───── 8. 방송 히스토리 페이지 ───── */
   broadcast: {
     sectionTitle: '방송 히스토리',
-    perPage     : 20,      // 한 페이지에 보여줄 개수
+    perPage     : 6,       // 한 페이지에 보여줄 개수 (임베드 높이에 맞춘 값)
     searchHint  : '제목·태그 검색',
     emptyText   : '아직 등록된 방송이 없어요 🍃',
     replayLabel : '다시보기',
@@ -134,7 +138,7 @@ window.SITE_CONFIG = {
     sectionEn    : 'Monthly Kurung',
     sectionTitle : '월간쿠룽',
     thumbsPerRow : 5,       // 썸네일 한 줄 개수
-    maxHeight    : 640,     // 사진 최대 높이(px)
+    maxHeight    : 430,     // 사진 최대 높이(px) (임베드 높이에 맞춘 값)
     emptyText    : '아직 등록된 화보가 없어요 🍃'
   },
 

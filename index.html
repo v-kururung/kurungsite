@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="CSS/style.css">
 </head>
 <body>
 
@@ -152,12 +152,15 @@ async function renderWeek(){
 
     var evts=data[ds]||[], inner;
     if(evts.length){
-      var times=evts.map(function(e){return e.time;}).filter(Boolean);
-      var titles=evts.map(function(e){return e.title;});
-      inner=(times.length?'<span class="etime">'+esc(times.join(' \u00b7 '))+'</span>':'')
-           +'<span class="etitle">'+esc(titles.join(' \u00b7 '))+'</span>';
+      /* 첫 일정만 보여주고, 나머지는 +N 배지로 알립니다 */
+      var first=evts[0], extra=evts.length-1;
       var tip=esc(evts.map(function(e){return (e.time?e.time+' ':'')+e.title;}).join(' / '));
-      inner='<div class="evt" title="'+tip+'"><div class="evt-in">'+inner+'</div></div>';
+      inner=(first.time?'<span class="etime">'+esc(first.time)+'</span>':'')
+           +'<span class="etitle">'+esc(first.title)+'</span>';
+      if(extra) inner+='<span class="emore">+'+extra+'</span>';
+      inner='<div class="evt'+(extra?' more':'')+'" title="'+tip+'"'
+           +(extra?' onclick="goSchedule(\''+ds+'\')"':'')
+           +'><div class="evt-in">'+inner+'</div></div>';
     }else{
       inner='<div class="evt empty"><div class="evt-in"><span class="etitle">'
             +esc(CAL.emptyText||'\u2014')+'</span></div></div>';
@@ -171,6 +174,13 @@ async function renderWeek(){
   document.getElementById('syncLabel').textContent='업데이트 '+
     t.getFullYear()+'-'+p(t.getMonth()+1)+'-'+p(t.getDate())+' '+
     p(t.getHours())+':'+p(t.getMinutes())+':'+p(t.getSeconds());
+}
+
+/* +N 배지 클릭 — 일정 페이지가 준비되면 그 날짜로 이동해 하이라이트합니다.
+   config.js 의 calendar.schedulePage 가 비어 있으면 아직 이동하지 않아요. */
+function goSchedule(ds){
+  if(!CAL.schedulePage) return;
+  location.href = CAL.schedulePage + '#d=' + ds;
 }
 
 renderWeek();
