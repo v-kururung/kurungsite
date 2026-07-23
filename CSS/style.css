@@ -131,15 +131,16 @@ a{color:inherit;text-decoration:none}
 .vthumb{aspect-ratio:16/9;position:relative;background:var(--portrait-bg)}
 .vthumb .vph{position:absolute;inset:0;display:grid;place-items:center;font-size:34px;opacity:.7}
 .vthumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
-.vbody{padding:15px 17px 17px;display:flex;flex-direction:column;gap:9px;flex:1}
+.vbody{padding:13px 15px 15px;display:flex;flex-direction:column;gap:8px;flex:1}
 .vtitle{font-size:16.5px;line-height:1.35;color:var(--ink);word-break:keep-all;overflow-wrap:break-word;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
   min-height:2.7em}
 .vdate{font-family:var(--latin);font-size:13px;color:var(--sub);letter-spacing:.3px}
 .vtags{display:flex;flex-wrap:wrap;gap:6px;height:23px;overflow:hidden}
 .vtags span{background:var(--pink-soft);color:var(--pink-deep);font-size:12px;padding:3px 10px;border-radius:20px}
-.vlabel{margin-top:auto;font-size:12.5px;color:var(--sub);margin-bottom:-5px}
-.vlinks{display:flex;gap:8px}
+/* '다시보기'와 버튼을 한 줄에 — 라벨 따로 한 줄을 쓰지 않습니다 */
+.vlinks{display:flex;align-items:center;gap:8px;margin-top:auto}
+.vlinks .vlabel{font-size:12.5px;color:var(--sub);margin-right:3px;flex-shrink:0}
 .vlinks a{display:flex;align-items:center;gap:6px;font-size:13px;padding:8px 14px;
   border-radius:12px;background:var(--page);color:var(--ink);transition:.2s}
 .vlinks a:hover{background:var(--sub2)}
