@@ -6,8 +6,12 @@
      DB     → D1 데이터베이스
      BUCKET → R2 버킷
    필요한 환경변수 (Pages > Settings > Variables):
-     ADMIN_TOKEN → 관리자 비밀 문자열 (직접 정해서 입력)
+     ADMIN_TOKEN          → 관리자 비밀 문자열 (직접 정해서 입력)
+     ROULETTE_PUBLIC_KEY  → 위플랩 공개 룰렛 확률표 주소의 끝부분
+                            https://weflab.com/user/<이 값>
    ═══════════════════════════════════════════════════════════ */
+
+import { handleRoulette } from './_lib/roulette.js';
 
 const JSON_HEAD = { 'Content-Type': 'application/json; charset=utf-8' };
 
@@ -28,6 +32,13 @@ export async function onRequest(context) {
   const method = request.method;
 
   try {
+    /* ───── 룰렛 주문내역 ─────
+       세부 경로와 인증 처리는 _lib/roulette.js 안에서 합니다.
+       확장 프로그램이 weflab.com에서 호출하므로 이 경로만 CORS가 열려 있습니다. */
+    if (seg === 'roulette') {
+      return await handleRoulette({ request, env, parts, admin: isAdmin(request, env) });
+    }
+
     /* ───── 이미지 제공: GET /api/img/<key> ───── */
     if (seg === 'img') {
       const key = parts.slice(1).join('/');
