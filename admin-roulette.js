@@ -15,22 +15,22 @@
   var BASE = ROOT + '/roulette';
   var UPLOAD = ROOT + '/upload';
 
+  var PAGE = 100;   /* 한 번에 불러올 후원 수 — 넘칠 때만 '더 보기'가 뜹니다 */
+
   var token = function () {
     if (typeof DB !== 'undefined' && DB.token) return DB.token();
     return localStorage.getItem('adminToken') || '';
   };
   var say = function (m) { if (typeof toast === 'function') toast(m); else console.log(m); };
 
-  var PAGE = 100;   /* 한 번에 불러올 후원 수 — 넘칠 때만 '더 보기'가 뜹니다 */
-
   var KIND = { instant: '즉시', task: '숙제', meta: '제외', unknown: '미분류' };
   var STATUS = { pending: '대기', scheduled: '예정', done: '완료', void: '제외' };
 
   var state = {
     status: 'pending', q: '', offset: 0,
-    orders: [], hasMore: false, sel: {}, menu: [], menuOpen: false,
-    anchor: null,   /* 처리 바를 붙일 후원 카드 */
-    image: '',      /* 이번에 첨부한 이미지 주소 */
+    orders: [], hasMore: false, menu: [], menuOpen: false,
+    pick: null,     /* 지금 고른 항목 (order_idx::seq) */
+    image: '',      /* 첨부한 이미지 주소 */
   };
 
   var dock;         /* 처리 바 — 목록을 다시 그려도 살아남도록 따로 들고 있습니다 */
@@ -74,6 +74,16 @@
     return state.orders.filter(function (x) { return x.idx === idx; })[0];
   };
 
+  /* 고른 항목 찾기 */
+  function picked() {
+    if (!state.pick) return null;
+    var p = state.pick.split('::');
+    var o = findOrder(p[0]);
+    if (!o) return null;
+    var it = o.items.filter(function (x) { return x.seq === Number(p[1]); })[0];
+    return it ? { order: o, item: it } : null;
+  }
+
   /* ───── 화면 뼈대 ───── */
 
   function shell() {
@@ -108,16 +118,17 @@
     d.className = 'rl-dock';
     d.innerHTML = [
       '<div class="rl-dock-row">',
-      '  <span class="rl-count"><b id="rlN">0</b>개 선택</span>',
+      '  <span class="rl-count" id="rlPicked"></span>',
       '  <input id="rlMemo" placeholder="비고 (선택)" autocomplete="off">',
       '  <input id="rlRef" placeholder="게시글 URL (선택)" autocomplete="off">',
       '  <div class="rl-acts">',
       '    <button class="btn" data-st="done">완료</button>',
-      '    <button class="btn sub" data-st="scheduled">예정</button>',
+      '    <button class="btn sub" data-st="pending">대기</button>',
       '    <button class="btn sub" data-st="void">제외</button>',
       '    <button class="btn sub" data-clear="1">해제</button>',
       '  </div>',
       '</div>',
+      '<div class="rl-hint">비우고 저장하면 지워집니다.</div>',
       '<div class="rl-dock-row">',
       '  <div class="rl-drop" id="rlDrop" tabindex="0">',
       '    <span class="rl-drop-txt">이미지를 <b>붙여넣기(Ctrl+V)</b> 하거나 끌어다 놓으세요 · 클릭해서 고를 수도 있어요</span>',
@@ -130,7 +141,7 @@
       var b = e.target.closest('button');
       if (!b) return;
       if (b.dataset.st) apply(b.dataset.st);
-      else if (b.dataset.clear) clearSel();
+      else if (b.dataset.clear) clearPick();
     });
 
     var drop = d.querySelector('#rlDrop');
@@ -190,8 +201,8 @@
     if (state.image) {
       drop.innerHTML =
         '<img class="rl-thumb" src="' + esc(state.image) + '" alt="">' +
-        '<span class="rl-drop-txt">첨부됨 — 완료를 누르면 함께 저장돼요</span>' +
-        '<button type="button" class="rl-thumb-x" title="첨부 취소">✕</button>';
+        '<span class="rl-drop-txt">첨부됨 — 저장하면 함께 기록돼요</span>' +
+        '<button type="button" class="rl-thumb-x" title="첨부 떼기">✕</button>';
       drop.querySelector('.rl-thumb-x').addEventListener('click', function (e) {
         e.stopPropagation();
         state.image = '';
@@ -297,7 +308,6 @@
     }
 
     wrap.innerHTML = state.orders.map(function (o) {
-      var picked = o.items.filter(function (it) { return state.sel[key(o.idx, it.seq)]; }).length;
       var prog = o.task_total
         ? '<span class="rl-prog' + (o.task_done === o.task_total ? ' full' : '') + '">완료 ' +
           o.task_done + '/' + o.task_total + '</span>'
@@ -316,9 +326,9 @@
           (it.done_at ? '<span class="rl-done-at">' + shortWhen(it.done_at) + '</span>' : '') +
           '<span class="rl-st rl-' + it.status + '">' + (STATUS[it.status] || it.status) + '</span>';
 
-        return '<label class="rl-item' + (state.sel[k] ? ' sel' : '') + '">' +
-          '<input type="checkbox" data-k="' + k + '" data-order="' + esc(o.idx) + '"' +
-          (state.sel[k] ? ' checked' : '') + '>' +
+        return '<label class="rl-item' + (state.pick === k ? ' sel' : '') + '">' +
+          '<input type="radio" name="rlPick" data-k="' + k + '" data-order="' + esc(o.idx) + '"' +
+          (state.pick === k ? ' checked' : '') + '>' +
           '<span class="rl-label">' + esc(it.label) + '</span>' +
           '<span class="rl-pct">' + it.percent + '%</span>' +
           (extra.length ? '<span class="rl-extra">' + extra.join(' · ') + '</span>' : '') +
@@ -333,33 +343,22 @@
         '<span class="rl-time">' + when(o.donated_at) + '</span>' +
         (o.msg ? '<span class="rl-msg">' + esc(o.msg) + '</span>' : '') +
         prog +
-        '<button class="rl-all" data-order="' + esc(o.idx) + '">' +
-        (picked === o.items.length ? '전체 해제' : '전체 선택') + '</button>' +
         '</div>' + items + '</div>';
     }).join('');
 
-    wrap.querySelectorAll('input[type=checkbox]').forEach(function (c) {
-      c.addEventListener('change', function () {
-        if (c.checked) state.sel[c.dataset.k] = true; else delete state.sel[c.dataset.k];
-        state.anchor = c.dataset.order;
-        c.closest('.rl-item').classList.toggle('sel', c.checked);
-        syncOrderButton(c.dataset.order);
-        placeDock();
-      });
-    });
-
-    wrap.querySelectorAll('.rl-all').forEach(function (b) {
-      b.addEventListener('click', function (e) {
-        e.preventDefault();
-        var o = findOrder(b.dataset.order);
-        if (!o) return;
-        var all = o.items.every(function (it) { return state.sel[key(o.idx, it.seq)]; });
-        o.items.forEach(function (it) {
-          if (all) delete state.sel[key(o.idx, it.seq)];
-          else state.sel[key(o.idx, it.seq)] = true;
-        });
-        state.anchor = all ? null : o.idx;
-        renderList();
+    /* 같은 항목을 다시 누르면 선택이 풀립니다 */
+    wrap.querySelectorAll('input[type=radio]').forEach(function (r) {
+      r.addEventListener('click', function () {
+        if (state.pick === r.dataset.k) {
+          state.pick = null;
+          r.checked = false;
+          resetInputs();
+          renderList();
+        } else {
+          state.pick = r.dataset.k;
+          renderList();
+          loadPick();          /* 고른 항목의 기존 값을 불러옵니다 */
+        }
       });
     });
 
@@ -367,42 +366,45 @@
     placeDock();
   }
 
-  /* 카드의 전체 선택/해제 라벨만 갱신 */
-  function syncOrderButton(idx) {
-    var o = findOrder(idx);
-    var btn = document.querySelector('.rl-all[data-order="' + idx + '"]');
-    if (!o || !btn) return;
-    var all = o.items.every(function (it) { return state.sel[key(o.idx, it.seq)]; });
-    btn.textContent = all ? '전체 해제' : '전체 선택';
-  }
-
-  /* ───── 처리 바 위치 ───── */
+  /* ───── 처리 바 ───── */
 
   function placeDock() {
-    var n = Object.keys(state.sel).length;
+    var p = picked();
 
-    if (n === 0) {
+    if (!p) {
       dock.classList.remove('on');
       if (dock.parentNode) dock.parentNode.removeChild(dock);
       return;
     }
 
-    /* 마지막으로 건드린 카드, 없으면 선택이 남아있는 첫 카드 */
-    var target = state.anchor && document.querySelector('.rl-order[data-order="' + state.anchor + '"]');
-    if (!target) {
-      var first = Object.keys(state.sel)[0].split('::')[0];
-      target = document.querySelector('.rl-order[data-order="' + first + '"]');
-    }
+    var target = document.querySelector('.rl-order[data-order="' + p.order.idx + '"]');
     if (!target) return;
 
-    dock.querySelector('#rlN').textContent = n;
+    dock.querySelector('#rlPicked').textContent = p.item.label;
     dock.classList.add('on');
     target.insertAdjacentElement('afterend', dock);
   }
 
-  function clearSel() {
-    state.sel = {};
-    state.anchor = null;
+  /* 고른 항목의 기존 값을 처리 바에 채웁니다 */
+  function loadPick() {
+    var p = picked();
+    if (!p) return;
+    dock.querySelector('#rlMemo').value = p.item.memo || '';
+    dock.querySelector('#rlRef').value = p.item.done_ref || '';
+    state.image = p.item.image_url || '';
+    renderDrop();
+  }
+
+  function resetInputs() {
+    state.image = '';
+    dock.querySelector('#rlMemo').value = '';
+    dock.querySelector('#rlRef').value = '';
+    renderDrop();
+  }
+
+  function clearPick() {
+    state.pick = null;
+    resetInputs();
     renderList();
   }
 
@@ -416,7 +418,7 @@
   /* ───── 동작 ───── */
 
   async function refresh(keepOffset) {
-    if (!keepOffset) { state.offset = 0; state.orders = []; state.sel = {}; state.anchor = null; }
+    if (!keepOffset) { state.offset = 0; state.orders = []; state.pick = null; state.image = ''; }
     var qs = '?scope=task&order=asc&limit=' + PAGE + '&offset=' + state.offset +
       (state.status ? '&status=' + state.status : '') +
       (state.q ? '&q=' + encodeURIComponent(state.q) : '');
@@ -438,11 +440,8 @@
   }
 
   async function apply(status) {
-    var targets = Object.keys(state.sel).map(function (k) {
-      var p = k.split('::');
-      return { order_idx: p[0], seq: Number(p[1]) };
-    });
-    if (targets.length === 0) return;
+    var p = picked();
+    if (!p) return;
 
     var memo = dock.querySelector('#rlMemo').value.trim();
     var ref = dock.querySelector('#rlRef').value.trim();
@@ -451,20 +450,17 @@
       await api('/items/status', {
         method: 'POST',
         body: {
-          targets: targets,
+          targets: [{ order_idx: p.order.idx, seq: p.item.seq }],
           status: status,
-          memo: memo || undefined,
-          done_ref: ref || undefined,
-          image_url: state.image || undefined,
+          /* 화면에 보이는 그대로 저장합니다 — 빈 칸은 지우기 */
+          memo: memo,
+          done_ref: ref,
+          image_url: state.image,
         },
       });
-      say(targets.length + '개 ' + STATUS[status] + ' 처리했어요');
-      state.sel = {};
-      state.anchor = null;
-      state.image = '';
-      dock.querySelector('#rlMemo').value = '';
-      dock.querySelector('#rlRef').value = '';
-      renderDrop();
+      say(p.item.label + ' → ' + STATUS[status]);
+      state.pick = null;
+      resetInputs();
       await refresh();
     } catch (e) { say('처리 실패: ' + e.message); }
   }
@@ -550,7 +546,6 @@
     '.rl-msg{color:#8b95a1;font-style:italic}',
     '.rl-prog{margin-left:auto;font-size:12px;padding:2px 9px;border-radius:999px;background:#f2f4f6;color:#6b7684}',
     '.rl-prog.full{background:#e8f7ee;color:#0f8b4c}',
-    '.rl-all{border:0;background:none;color:#3182f6;font:inherit;font-size:12px;cursor:pointer}',
     '.rl-item{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;font-size:13px;cursor:pointer}',
     '.rl-item:hover{background:#f8f9fa}',
     '.rl-item.sel{background:#e8f3ff}',
@@ -576,13 +571,14 @@
     '.rl-k+.rl-k{border-left:1px solid #e5e8eb}',
     '.rl-k:hover{background:#f2f4f6}',
     '.rl-k.on{background:#3182f6;color:#fff;font-weight:600}',
-    /* 처리 바 — 선택한 카드 바로 아래에 붙습니다 */
+    /* 처리 바 — 고른 항목이 있는 카드 바로 아래에 붙습니다 */
     '.rl-dock{display:none;flex-direction:column;gap:8px;',
     'margin:-4px 0 14px;padding:11px 13px;border-radius:12px;',
     'background:#f8fbff;border:1px solid #c9deff}',
     '.rl-dock.on{display:flex}',
     '.rl-dock-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
-    '.rl-count{font-size:13px;color:#1b64da;font-weight:600;white-space:nowrap}',
+    '.rl-hint{font-size:12px;color:#6b7684;margin:-4px 0 0 2px}',
+    '.rl-count{font-size:13px;color:#1b64da;font-weight:700;white-space:nowrap}',
     '.rl-dock input{padding:8px 11px;border:1px solid #d1d6db;border-radius:8px;font:inherit;font-size:13px;background:#fff}',
     '.rl-dock #rlMemo{flex:3;min-width:220px}',
     '.rl-dock #rlRef{flex:2;min-width:160px}',
