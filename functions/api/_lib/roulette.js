@@ -278,8 +278,10 @@ async function list(request, env, admin) {
   const scope = u.searchParams.get('scope') === 'all' ? 'all' : 'task';
   const status = u.searchParams.get('status') || '';
   const q = (u.searchParams.get('q') || '').trim();
-  const limit = Math.min(Number(u.searchParams.get('limit')) || 10, 50);
+  const limit = Math.min(Number(u.searchParams.get('limit')) || 10, 200);
   const offset = Math.max(Number(u.searchParams.get('offset')) || 0, 0);
+  /* 관리자는 오래된 순(먼저 받은 숙제부터), 방문자 화면은 최신순이 자연스럽습니다 */
+  const dir = u.searchParams.get('order') === 'asc' ? 'ASC' : 'DESC';
 
   /* 주문을 고를 때 쓰는 조건 — 상태 필터를 포함합니다 */
   const itemCond = [];
@@ -304,7 +306,7 @@ async function list(request, env, admin) {
        FROM roulette_orders o
       WHERE EXISTS (SELECT 1 FROM roulette_items i WHERE i.order_idx = o.idx${itemWhere})
       ${searchWhere}
-      ORDER BY o.donated_at DESC
+      ORDER BY o.donated_at ${dir}
       LIMIT ? OFFSET ?`
   ).bind(...itemArgs, ...searchArgs, limit, offset).all();
 

@@ -21,6 +21,8 @@
   };
   var say = function (m) { if (typeof toast === 'function') toast(m); else console.log(m); };
 
+  var PAGE = 100;   /* 한 번에 불러올 후원 수 — 넘칠 때만 '더 보기'가 뜹니다 */
+
   var KIND = { instant: '즉시', task: '숙제', meta: '제외', unknown: '미분류' };
   var STATUS = { pending: '대기', scheduled: '예정', done: '완료', void: '제외' };
 
@@ -96,7 +98,7 @@
       '    <button class="btn sub" id="rlSets">확률표 갱신</button>',
       '  </div>',
       '  <div id="rlList" class="rl-list"></div>',
-      '  <div class="actions"><button class="btn sub" id="rlMore" style="display:none">더 보기</button></div>',
+      '  <div class="actions"><button class="btn sub" id="rlMore" style="display:none">더 보기 (' + PAGE + '건씩)</button></div>',
       '</div>',
     ].join('');
   }
@@ -415,7 +417,7 @@
 
   async function refresh(keepOffset) {
     if (!keepOffset) { state.offset = 0; state.orders = []; state.sel = {}; state.anchor = null; }
-    var qs = '?scope=task&limit=10&offset=' + state.offset +
+    var qs = '?scope=task&order=asc&limit=' + PAGE + '&offset=' + state.offset +
       (state.status ? '&status=' + state.status : '') +
       (state.q ? '&q=' + encodeURIComponent(state.q) : '');
 
@@ -501,7 +503,7 @@
     });
 
     document.getElementById('rlMore').addEventListener('click', function () {
-      state.offset += 10;
+      state.offset += PAGE;
       refresh(true);
     });
 
