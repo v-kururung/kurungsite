@@ -44,16 +44,26 @@ export const normKey = (s) =>
     .replace(/\s+/g, ' ')
     .trim();
 
-/** 위플랩 alertlist 레코드 → 우리 구조. 룰렛 결과가 없으면 null */
+/**
+ * 위플랩 alertlist 레코드 → 우리 구조. 룰렛 결과가 없으면 null.
+ *
+ * list 는 연차(여러 회) 후원에만 채워집니다. 330개처럼 11회 돌아가는 건
+ * list 에 결과가 전부 들어오지만, 33개 단차는 list 가 비어 있고
+ * roulette / percent 에만 값이 옵니다. 그 경우 한 건짜리 목록으로 만듭니다.
+ */
 export function parseRecord(r) {
+  if (!r.idx) return null;
+
   let list;
   try {
     list = JSON.parse(r.list || '[]');
   } catch {
-    return null;
+    list = [];
   }
-  if (!Array.isArray(list) || list.length === 0) return null;
-  if (!r.idx) return null;
+  if (!Array.isArray(list)) list = [];
+
+  if (list.length === 0 && r.roulette) list = [[r.roulette, r.percent]];
+  if (list.length === 0) return null;
 
   return {
     idx: String(r.idx),
@@ -271,11 +281,16 @@ async function list(request, env, admin) {
   const limit = Math.min(Number(u.searchParams.get('limit')) || 10, 50);
   const offset = Math.max(Number(u.searchParams.get('offset')) || 0, 0);
 
+  /* 주문을 고를 때 쓰는 조건 — 상태 필터를 포함합니다 */
   const itemCond = [];
   const itemArgs = [];
   if (scope === 'task') itemCond.push(`i.kind NOT IN ('instant','meta')`);
   if (status) { itemCond.push(`i.status = ?`); itemArgs.push(status); }
   const itemWhere = itemCond.length ? ` AND ${itemCond.join(' AND ')}` : '';
+
+  /* 화면에 뿌릴 때는 그 주문의 숙제를 전부 보여줍니다.
+     처리가 끝난 항목도 함께 보여야 진행 상황을 알 수 있으니까요. */
+  const showWhere = scope === 'task' ? ` AND kind NOT IN ('instant','meta')` : '';
 
   const searchWhere = q ? ` AND (o.donor_name LIKE ? OR o.donor_id LIKE ?)` : '';
   const searchArgs = q ? [`%${q}%`, `%${q}%`] : [];
@@ -295,9 +310,9 @@ async function list(request, env, admin) {
   const itemsQ = await env.DB.prepare(
     `SELECT order_idx, seq, label, percent, kind, status, done_at, done_ref, memo, resolved_label
        FROM roulette_items
-      WHERE order_idx IN (${ids.map(() => '?').join(',')})${itemWhere.replace(/\bi\./g, '')}
+      WHERE order_idx IN (${ids.map(() => '?').join(',')})${showWhere}
       ORDER BY seq`
-  ).bind(...ids, ...itemArgs).all();
+  ).bind(...ids).all();
 
   const grouped = new Map(ids.map((id) => [id, []]));
   itemsQ.results.forEach((it) => grouped.get(it.order_idx)?.push(it));

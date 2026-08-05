@@ -21,7 +21,10 @@
   var state = {
     status: 'pending', q: '', offset: 0,
     orders: [], hasMore: false, sel: {}, menu: [], menuOpen: false,
+    anchor: null,   /* 처리 바를 붙일 후원 카드 */
   };
+
+  var dock;         /* 처리 바 — 목록을 다시 그려도 살아남도록 따로 들고 있습니다 */
 
   /* ───── 통신 ───── */
 
@@ -48,6 +51,9 @@
   /* donated_at 은 위플랩이 준 한국 시간이라 그대로 자릅니다 */
   var when = function (s) { return String(s || '').slice(0, 16); };
   var key = function (o, i) { return o + '::' + i; };
+  var findOrder = function (idx) {
+    return state.orders.filter(function (x) { return x.idx === idx; })[0];
+  };
 
   /* ───── 화면 뼈대 ───── */
 
@@ -75,26 +81,31 @@
       '  <div id="rlList" class="rl-list"></div>',
       '  <div class="actions"><button class="btn sub" id="rlMore" style="display:none">더 보기</button></div>',
       '</div>',
+    ].join('');
+  }
 
-      '<div class="rl-dock" id="rlDock">',
-      '  <div class="rl-dock-in">',
-      '    <span class="rl-count"><b id="rlN">0</b>개 선택</span>',
-      '    <input id="rlMemo" placeholder="비고 (선택)" autocomplete="off">',
-      '    <div class="rl-quick">',
-      '      <button data-memo="구독권 선물">구독권 선물</button>',
-      '      <button data-memo="방송국 구독">방송국 구독</button>',
-      '    </div>',
-      '    <input id="rlSwap" placeholder="교체 항목 (선택)" autocomplete="off">',
-      '    <input id="rlRef" placeholder="다시보기 링크 (선택)" autocomplete="off">',
-      '    <div class="rl-acts">',
-      '      <button class="btn" data-st="done">완료</button>',
-      '      <button class="btn sub" data-st="scheduled">예정</button>',
-      '      <button class="btn sub" data-st="void">제외</button>',
-      '      <button class="btn sub" id="rlClear">해제</button>',
-      '    </div>',
-      '  </div>',
+  function buildDock() {
+    var d = document.createElement('div');
+    d.className = 'rl-dock';
+    d.innerHTML = [
+      '<span class="rl-count"><b id="rlN">0</b>개 선택</span>',
+      '<input id="rlMemo" placeholder="비고 (선택)" autocomplete="off">',
+      '<input id="rlRef" placeholder="게시글 URL (선택)" autocomplete="off">',
+      '<div class="rl-acts">',
+      '  <button class="btn" data-st="done">완료</button>',
+      '  <button class="btn sub" data-st="scheduled">예정</button>',
+      '  <button class="btn sub" data-st="void">제외</button>',
+      '  <button class="btn sub" data-clear="1">해제</button>',
       '</div>',
     ].join('');
+
+    d.addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      if (b.dataset.st) apply(b.dataset.st);
+      else if (b.dataset.clear) clearSel();
+    });
+    return d;
   }
 
   /* ───── 미분류 안내 ───── */
@@ -109,20 +120,22 @@
       '<h3>분류가 필요한 항목 ' + un.length + '개</h3>' +
       '<p class="rl-help">방송 중에 바로 끝나는 건 <b>즉시</b>, 나중에 해줘야 하는 건 <b>숙제</b>, ' +
       '다음 룰렛 2배처럼 해줄 일이 없는 건 <b>제외</b>를 눌러주세요. 나중에 언제든 바꿀 수 있어요.</p>' +
-      '<div class="rl-un">' + un.map(row).join('') + '</div>';
+      '<div class="rl-un">' + menuRow(un).join('') + '</div>';
     bindKindButtons(box);
   }
 
   /* ───── 항목 관리 (분류 수정) ───── */
 
-  function row(m) {
-    var seg = ['instant', 'task', 'meta'].map(function (k) {
-      return '<button class="rl-k' + (m.kind === k ? ' on' : '') + '" data-k="' + k +
-        '" data-key="' + esc(m.label_key) + '">' + KIND[k] + '</button>';
-    }).join('');
-    return '<div class="rl-un-row">' +
-      '<span class="rl-un-name">' + esc(m.label) + '</span>' +
-      '<span class="rl-kseg">' + seg + '</span></div>';
+  function menuRow(items) {
+    return items.map(function (m) {
+      var seg = ['instant', 'task', 'meta'].map(function (k) {
+        return '<button class="rl-k' + (m.kind === k ? ' on' : '') + '" data-k="' + k +
+          '" data-key="' + esc(m.label_key) + '">' + KIND[k] + '</button>';
+      }).join('');
+      return '<div class="rl-un-row">' +
+        '<span class="rl-un-name">' + esc(m.label) + '</span>' +
+        '<span class="rl-kseg">' + seg + '</span></div>';
+    });
   }
 
   function renderMenu() {
@@ -138,7 +151,7 @@
     wrap.innerHTML =
       '<p class="rl-help">분류를 바꾸면 앞으로 들어올 결과에 적용됩니다. ' +
       '이미 쌓인 기록까지 바꿀지는 누를 때 물어봐요.</p>' +
-      sorted.map(row).join('');
+      menuRow(sorted).join('');
     bindKindButtons(wrap);
   }
 
@@ -160,7 +173,7 @@
       reapply = confirm(
         label_key + ' : ' + KIND[prev] + ' → ' + KIND[kind] + '\n\n' +
         '이미 쌓인 기록도 함께 바꿀까요?\n' +
-        '자동으로 처리된 것만 바꾸고, 비고나 다시보기 링크를 남긴 건은 그대로 둡니다.\n\n' +
+        '자동으로 처리된 것만 바꾸고, 비고나 게시글 URL을 남긴 건은 그대로 둡니다.\n\n' +
         '취소를 누르면 앞으로 들어올 결과에만 적용돼요.'
       );
     }
@@ -184,60 +197,107 @@
       wrap.innerHTML = '<p class="rl-empty">' +
         (state.status === 'pending' ? '남은 숙제가 없어요 🎉' : '해당하는 내역이 없어요') + '</p>';
       document.getElementById('rlMore').style.display = 'none';
+      placeDock();
       return;
     }
 
     wrap.innerHTML = state.orders.map(function (o) {
+      var picked = o.items.filter(function (it) { return state.sel[key(o.idx, it.seq)]; }).length;
+
       var items = o.items.map(function (it) {
         var k = key(o.idx, it.seq);
         var extra = [];
         if (it.resolved_label) extra.push('→ <b>' + esc(it.resolved_label) + '</b>');
         if (it.memo) extra.push(esc(it.memo));
         return '<label class="rl-item' + (state.sel[k] ? ' sel' : '') + '">' +
-          '<input type="checkbox" data-k="' + k + '"' + (state.sel[k] ? ' checked' : '') + '>' +
+          '<input type="checkbox" data-k="' + k + '" data-order="' + esc(o.idx) + '"' +
+          (state.sel[k] ? ' checked' : '') + '>' +
           '<span class="rl-label">' + esc(it.label) + '</span>' +
           '<span class="rl-pct">' + it.percent + '%</span>' +
           (extra.length ? '<span class="rl-extra">' + extra.join(' · ') + '</span>' : '') +
           '<span class="rl-st rl-' + it.status + '">' + (STATUS[it.status] || it.status) + '</span>' +
-          (it.done_ref ? '<a class="rl-ref" href="' + esc(it.done_ref) + '" target="_blank">다시보기</a>' : '') +
+          (it.done_ref ? '<a class="rl-ref" href="' + esc(it.done_ref) + '" target="_blank">게시글</a>' : '') +
           '</label>';
       }).join('');
 
-      return '<div class="rl-order">' +
+      return '<div class="rl-order" data-order="' + esc(o.idx) + '">' +
         '<div class="rl-head">' +
         '<b>' + esc(o.donor_name) + '</b><span class="rl-id">' + esc(o.donor_id) + '</span>' +
         '<span class="rl-amt">' + o.amount + '개</span>' +
         '<span class="rl-time">' + when(o.donated_at) + '</span>' +
         (o.msg ? '<span class="rl-msg">' + esc(o.msg) + '</span>' : '') +
-        '<button class="rl-all" data-order="' + esc(o.idx) + '">전체 선택</button>' +
+        '<button class="rl-all" data-order="' + esc(o.idx) + '">' +
+        (picked === o.items.length ? '전체 해제' : '전체 선택') + '</button>' +
         '</div>' + items + '</div>';
     }).join('');
 
     wrap.querySelectorAll('input[type=checkbox]').forEach(function (c) {
       c.addEventListener('change', function () {
         if (c.checked) state.sel[c.dataset.k] = true; else delete state.sel[c.dataset.k];
+        state.anchor = c.dataset.order;
         c.closest('.rl-item').classList.toggle('sel', c.checked);
-        renderDock();
+        syncOrderButton(c.dataset.order);
+        placeDock();
       });
     });
 
     wrap.querySelectorAll('.rl-all').forEach(function (b) {
       b.addEventListener('click', function (e) {
         e.preventDefault();
-        var o = state.orders.filter(function (x) { return x.idx === b.dataset.order; })[0];
+        var o = findOrder(b.dataset.order);
         if (!o) return;
-        o.items.forEach(function (it) { state.sel[key(o.idx, it.seq)] = true; });
-        renderList(); renderDock();
+        var all = o.items.every(function (it) { return state.sel[key(o.idx, it.seq)]; });
+        o.items.forEach(function (it) {
+          if (all) delete state.sel[key(o.idx, it.seq)];
+          else state.sel[key(o.idx, it.seq)] = true;
+        });
+        state.anchor = all ? null : o.idx;
+        renderList();
+        placeDock();
       });
     });
 
     document.getElementById('rlMore').style.display = state.hasMore ? '' : 'none';
+    placeDock();
   }
 
-  function renderDock() {
+  /* 카드의 전체 선택/해제 라벨만 갱신 */
+  function syncOrderButton(idx) {
+    var o = findOrder(idx);
+    var btn = document.querySelector('.rl-all[data-order="' + idx + '"]');
+    if (!o || !btn) return;
+    var all = o.items.every(function (it) { return state.sel[key(o.idx, it.seq)]; });
+    btn.textContent = all ? '전체 해제' : '전체 선택';
+  }
+
+  /* ───── 처리 바 위치 ───── */
+
+  function placeDock() {
     var n = Object.keys(state.sel).length;
-    document.getElementById('rlN').textContent = n;
-    document.getElementById('rlDock').classList.toggle('on', n > 0);
+
+    if (n === 0) {
+      dock.classList.remove('on');
+      if (dock.parentNode) dock.parentNode.removeChild(dock);
+      return;
+    }
+
+    /* 선택이 남아있는 카드 중 마지막으로 건드린 곳, 없으면 첫 번째 */
+    var target = state.anchor && document.querySelector('.rl-order[data-order="' + state.anchor + '"]');
+    if (!target) {
+      var first = Object.keys(state.sel)[0].split('::')[0];
+      target = document.querySelector('.rl-order[data-order="' + first + '"]');
+    }
+    if (!target) return;
+
+    dock.querySelector('#rlN').textContent = n;
+    dock.classList.add('on');
+    target.insertAdjacentElement('afterend', dock);
+  }
+
+  function clearSel() {
+    state.sel = {};
+    state.anchor = null;
+    renderList();
   }
 
   function renderSum(s) {
@@ -250,7 +310,7 @@
   /* ───── 동작 ───── */
 
   async function refresh(keepOffset) {
-    if (!keepOffset) { state.offset = 0; state.orders = []; state.sel = {}; }
+    if (!keepOffset) { state.offset = 0; state.orders = []; state.sel = {}; state.anchor = null; }
     var qs = '?scope=task&limit=10&offset=' + state.offset +
       (state.status ? '&status=' + state.status : '') +
       (state.q ? '&q=' + encodeURIComponent(state.q) : '');
@@ -265,7 +325,6 @@
       state.orders = state.offset === 0 ? res[2].orders : state.orders.concat(res[2].orders);
       state.hasMore = res[2].hasMore;
       renderList();
-      renderDock();
     } catch (e) {
       document.getElementById('rlList').innerHTML =
         '<p class="rl-empty">불러오지 못했어요 — ' + esc(e.message) + '</p>';
@@ -279,9 +338,8 @@
     });
     if (targets.length === 0) return;
 
-    var memo = document.getElementById('rlMemo').value.trim();
-    var swap = document.getElementById('rlSwap').value.trim();
-    var ref = document.getElementById('rlRef').value.trim();
+    var memo = dock.querySelector('#rlMemo').value.trim();
+    var ref = dock.querySelector('#rlRef').value.trim();
 
     try {
       await api('/items/status', {
@@ -290,13 +348,14 @@
           targets: targets,
           status: status,
           memo: memo || undefined,
-          resolved_label: swap || undefined,
           done_ref: ref || undefined,
         },
       });
       say(targets.length + '개 ' + STATUS[status] + ' 처리했어요');
       state.sel = {};
-      ['rlMemo', 'rlSwap', 'rlRef'].forEach(function (id) { document.getElementById(id).value = ''; });
+      state.anchor = null;
+      dock.querySelector('#rlMemo').value = '';
+      dock.querySelector('#rlRef').value = '';
       await refresh();
     } catch (e) { say('처리 실패: ' + e.message); }
   }
@@ -309,6 +368,7 @@
     var panel = document.getElementById('p-roulette');
     if (!panel) return;
     panel.innerHTML = shell();
+    dock = buildDock();
     ready = true;
 
     document.getElementById('rlMenuHead').addEventListener('click', function () {
@@ -345,14 +405,6 @@
         say(r.changed ? '새 룰렛 세트를 받았어요' : '바뀐 내용이 없어요');
         await refresh();
       } catch (e) { say('갱신 실패: ' + e.message); }
-    });
-
-    document.getElementById('rlDock').addEventListener('click', function (e) {
-      var b = e.target.closest('button');
-      if (!b) return;
-      if (b.dataset.st) apply(b.dataset.st);
-      else if (b.dataset.memo) document.getElementById('rlMemo').value = b.dataset.memo;
-      else if (b.id === 'rlClear') { state.sel = {}; renderList(); renderDock(); }
     });
 
     refresh();
@@ -410,14 +462,15 @@
     '.rl-k+.rl-k{border-left:1px solid #e5e8eb}',
     '.rl-k:hover{background:#f2f4f6}',
     '.rl-k.on{background:#3182f6;color:#fff;font-weight:600}',
-    '.rl-dock{position:sticky;bottom:0;margin-top:14px;display:none}',
-    '.rl-dock.on{display:block}',
-    '.rl-dock-in{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 14px;border-radius:12px;background:#fff;border:1px solid #d1d6db;box-shadow:0 -2px 16px rgba(0,0,0,.08)}',
-    '.rl-count{font-size:13px;color:#4e5968;white-space:nowrap}',
-    '.rl-dock-in input{padding:8px 11px;border:1px solid #e5e8eb;border-radius:8px;font:inherit;font-size:13px;min-width:130px;flex:1}',
-    '.rl-quick{display:flex;gap:4px}',
-    '.rl-quick button{padding:6px 10px;border:1px solid #e5e8eb;border-radius:7px;background:#fff;font:inherit;font-size:12px;color:#4e5968;cursor:pointer;white-space:nowrap}',
-    '.rl-quick button:hover{background:#f2f4f6}',
+    /* 처리 바 — 선택한 카드 바로 아래에 붙습니다 */
+    '.rl-dock{display:none;align-items:center;gap:8px;flex-wrap:wrap;',
+    'margin:-4px 0 14px;padding:11px 13px;border-radius:12px;',
+    'background:#f8fbff;border:1px solid #c9deff}',
+    '.rl-dock.on{display:flex}',
+    '.rl-count{font-size:13px;color:#1b64da;font-weight:600;white-space:nowrap}',
+    '.rl-dock input{padding:8px 11px;border:1px solid #d1d6db;border-radius:8px;font:inherit;font-size:13px;background:#fff}',
+    '.rl-dock #rlMemo{flex:3;min-width:220px}',
+    '.rl-dock #rlRef{flex:2;min-width:160px}',
     '.rl-acts{display:flex;gap:6px;margin-left:auto}',
   ].join('');
   document.head.appendChild(css);
