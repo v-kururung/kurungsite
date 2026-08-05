@@ -105,7 +105,7 @@ export async function handleRoulette({ request, env, parts, admin }) {
 
   try {
     if (sub === 'sync' && m === 'POST') return admin ? await sync(request, env) : denied();
-    if (sub === 'list' && m === 'GET') return await list(request, env);
+    if (sub === 'list' && m === 'GET') return await list(request, env, admin);
     if (sub === 'stats' && m === 'GET') return await stats(env);
     if (sub === 'sets' && !sub2 && m === 'GET') return json(await currentSets(env));
 
@@ -263,7 +263,7 @@ async function maybeSyncSets(env) {
  * ?scope=task|all  ?status=pending|done  ?q=닉네임  ?limit=&offset=
  * ------------------------------------------------------------------ */
 
-async function list(request, env) {
+async function list(request, env, admin) {
   const u = new URL(request.url);
   const scope = u.searchParams.get('scope') === 'all' ? 'all' : 'task';
   const status = u.searchParams.get('status') || '';
@@ -306,7 +306,7 @@ async function list(request, env) {
     orders: rows.map((o) => ({
       idx: o.idx,
       donor_name: o.donor_name,
-      donor_id: maskId(o.donor_id),
+      donor_id: admin ? o.donor_id : maskId(o.donor_id),
       amount: o.amount,
       msg: o.msg,
       donated_at: o.donated_at,

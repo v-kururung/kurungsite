@@ -37,6 +37,7 @@
       <button data-t="gallery" onclick="tab('gallery')">🖼 월간쿠룽</button>
       <button data-t="inquiry" onclick="tab('inquiry')">💌 문의</button>
       <button data-t="profile" onclick="tab('profile')">🧝 프로필</button>
+      <button data-t="roulette" onclick="tab('roulette')">🎯 룰렛 숙제</button>
     </div>
 
     <!-- ───── 방송 ───── -->
@@ -164,6 +165,9 @@
         </div>
       </div>
     </div>
+
+    <!-- ───── 룰렛 숙제 (admin-roulette.js 가 채웁니다) ───── -->
+    <div class="panel" id="p-roulette"></div>
   </div>
 </div>
 
@@ -1104,5 +1108,6 @@ async function saveProfile(){
   });
 })();
 </script>
+<script src="admin-roulette.js"></script>
 </body>
 </html>
