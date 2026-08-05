@@ -5,10 +5,16 @@
      · 탭 버튼   <button data-t="roulette" onclick="tab('roulette')">
      · 패널 자리 <div class="panel" id="p-roulette"></div>
      · 스크립트  <script src="admin-roulette.js"></script>
+
+   이미지 첨부에는 컬럼이 하나 필요합니다.
+     ALTER TABLE roulette_items ADD COLUMN image_url TEXT;
    ═══════════════════════════════════════════════════════════ */
 
 (function () {
-  var BASE = (typeof API !== 'undefined' ? API : '/api') + '/roulette';
+  var ROOT = (typeof API !== 'undefined' ? API : '/api');
+  var BASE = ROOT + '/roulette';
+  var UPLOAD = ROOT + '/upload';
+
   var token = function () {
     if (typeof DB !== 'undefined' && DB.token) return DB.token();
     return localStorage.getItem('adminToken') || '';
@@ -22,6 +28,7 @@
     status: 'pending', q: '', offset: 0,
     orders: [], hasMore: false, sel: {}, menu: [], menuOpen: false,
     anchor: null,   /* 처리 바를 붙일 후원 카드 */
+    image: '',      /* 이번에 첨부한 이미지 주소 */
   };
 
   var dock;         /* 처리 바 — 목록을 다시 그려도 살아남도록 따로 들고 있습니다 */
@@ -40,6 +47,15 @@
     return data;
   }
 
+  async function upload(file) {
+    var fd = new FormData();
+    fd.append('file', file, file.name || 'paste.png');
+    var res = await fetch(UPLOAD, { method: 'POST', headers: { 'X-Admin-Token': token() }, body: fd });
+    var data = await res.json().catch(function () { return {}; });
+    if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+    return data.url;
+  }
+
   /* ───── 도우미 ───── */
 
   var esc = function (s) {
@@ -48,8 +64,9 @@
     });
   };
 
-  /* donated_at 은 위플랩이 준 한국 시간이라 그대로 자릅니다 */
+  /* 저장된 시각은 모두 한국 시간 문자열입니다 */
   var when = function (s) { return String(s || '').slice(0, 16); };
+  var shortWhen = function (s) { return String(s || '').slice(5, 16); };
   var key = function (o, i) { return o + '::' + i; };
   var findOrder = function (idx) {
     return state.orders.filter(function (x) { return x.idx === idx; })[0];
@@ -88,14 +105,22 @@
     var d = document.createElement('div');
     d.className = 'rl-dock';
     d.innerHTML = [
-      '<span class="rl-count"><b id="rlN">0</b>개 선택</span>',
-      '<input id="rlMemo" placeholder="비고 (선택)" autocomplete="off">',
-      '<input id="rlRef" placeholder="게시글 URL (선택)" autocomplete="off">',
-      '<div class="rl-acts">',
-      '  <button class="btn" data-st="done">완료</button>',
-      '  <button class="btn sub" data-st="scheduled">예정</button>',
-      '  <button class="btn sub" data-st="void">제외</button>',
-      '  <button class="btn sub" data-clear="1">해제</button>',
+      '<div class="rl-dock-row">',
+      '  <span class="rl-count"><b id="rlN">0</b>개 선택</span>',
+      '  <input id="rlMemo" placeholder="비고 (선택)" autocomplete="off">',
+      '  <input id="rlRef" placeholder="게시글 URL (선택)" autocomplete="off">',
+      '  <div class="rl-acts">',
+      '    <button class="btn" data-st="done">완료</button>',
+      '    <button class="btn sub" data-st="scheduled">예정</button>',
+      '    <button class="btn sub" data-st="void">제외</button>',
+      '    <button class="btn sub" data-clear="1">해제</button>',
+      '  </div>',
+      '</div>',
+      '<div class="rl-dock-row">',
+      '  <div class="rl-drop" id="rlDrop" tabindex="0">',
+      '    <span class="rl-drop-txt">이미지를 <b>붙여넣기(Ctrl+V)</b> 하거나 끌어다 놓으세요 · 클릭해서 고를 수도 있어요</span>',
+      '  </div>',
+      '  <input type="file" id="rlFile" accept="image/*" hidden>',
       '</div>',
     ].join('');
 
@@ -105,7 +130,75 @@
       if (b.dataset.st) apply(b.dataset.st);
       else if (b.dataset.clear) clearSel();
     });
+
+    var drop = d.querySelector('#rlDrop');
+    var file = d.querySelector('#rlFile');
+
+    drop.addEventListener('click', function (e) {
+      if (e.target.closest('.rl-thumb-x')) return;
+      file.click();
+    });
+    file.addEventListener('change', function () {
+      if (file.files[0]) takeImage(file.files[0]);
+      file.value = '';
+    });
+
+    drop.addEventListener('dragover', function (e) { e.preventDefault(); drop.classList.add('over'); });
+    drop.addEventListener('dragleave', function () { drop.classList.remove('over'); });
+    drop.addEventListener('drop', function (e) {
+      e.preventDefault(); drop.classList.remove('over');
+      var f = e.dataTransfer.files[0];
+      if (f) takeImage(f);
+    });
+
     return d;
+  }
+
+  /* 처리 바가 떠 있을 때만 붙여넣기를 받습니다 */
+  document.addEventListener('paste', function (e) {
+    if (!dock || !dock.classList.contains('on')) return;
+    var items = (e.clipboardData || {}).items || [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].type && items[i].type.indexOf('image') === 0) {
+        var f = items[i].getAsFile();
+        if (f) { e.preventDefault(); takeImage(f); }
+        return;
+      }
+    }
+  });
+
+  async function takeImage(file) {
+    var drop = dock.querySelector('#rlDrop');
+    drop.classList.add('busy');
+    drop.querySelector('.rl-drop-txt').textContent = '올리는 중…';
+    try {
+      state.image = await upload(file);
+      renderDrop();
+      say('이미지를 첨부했어요');
+    } catch (e) {
+      state.image = '';
+      renderDrop();
+      say('업로드 실패: ' + e.message);
+    }
+  }
+
+  function renderDrop() {
+    var drop = dock.querySelector('#rlDrop');
+    drop.classList.remove('busy');
+    if (state.image) {
+      drop.innerHTML =
+        '<img class="rl-thumb" src="' + esc(state.image) + '" alt="">' +
+        '<span class="rl-drop-txt">첨부됨 — 완료를 누르면 함께 저장돼요</span>' +
+        '<button type="button" class="rl-thumb-x" title="첨부 취소">✕</button>';
+      drop.querySelector('.rl-thumb-x').addEventListener('click', function (e) {
+        e.stopPropagation();
+        state.image = '';
+        renderDrop();
+      });
+    } else {
+      drop.innerHTML =
+        '<span class="rl-drop-txt">이미지를 <b>붙여넣기(Ctrl+V)</b> 하거나 끌어다 놓으세요 · 클릭해서 고를 수도 있어요</span>';
+    }
   }
 
   /* ───── 미분류 안내 ───── */
@@ -203,20 +296,31 @@
 
     wrap.innerHTML = state.orders.map(function (o) {
       var picked = o.items.filter(function (it) { return state.sel[key(o.idx, it.seq)]; }).length;
+      var prog = o.task_total
+        ? '<span class="rl-prog' + (o.task_done === o.task_total ? ' full' : '') + '">완료 ' +
+          o.task_done + '/' + o.task_total + '</span>'
+        : '';
 
       var items = o.items.map(function (it) {
         var k = key(o.idx, it.seq);
         var extra = [];
         if (it.resolved_label) extra.push('→ <b>' + esc(it.resolved_label) + '</b>');
         if (it.memo) extra.push(esc(it.memo));
+
+        var right =
+          (it.image_url ? '<a class="rl-shot" href="' + esc(it.image_url) + '" target="_blank">' +
+            '<img src="' + esc(it.image_url) + '" alt=""></a>' : '') +
+          (it.done_ref ? '<a class="rl-ref" href="' + esc(it.done_ref) + '" target="_blank">게시글</a>' : '') +
+          (it.done_at ? '<span class="rl-done-at">' + shortWhen(it.done_at) + '</span>' : '') +
+          '<span class="rl-st rl-' + it.status + '">' + (STATUS[it.status] || it.status) + '</span>';
+
         return '<label class="rl-item' + (state.sel[k] ? ' sel' : '') + '">' +
           '<input type="checkbox" data-k="' + k + '" data-order="' + esc(o.idx) + '"' +
           (state.sel[k] ? ' checked' : '') + '>' +
           '<span class="rl-label">' + esc(it.label) + '</span>' +
           '<span class="rl-pct">' + it.percent + '%</span>' +
           (extra.length ? '<span class="rl-extra">' + extra.join(' · ') + '</span>' : '') +
-          '<span class="rl-st rl-' + it.status + '">' + (STATUS[it.status] || it.status) + '</span>' +
-          (it.done_ref ? '<a class="rl-ref" href="' + esc(it.done_ref) + '" target="_blank">게시글</a>' : '') +
+          '<span class="rl-right">' + right + '</span>' +
           '</label>';
       }).join('');
 
@@ -226,6 +330,7 @@
         '<span class="rl-amt">' + o.amount + '개</span>' +
         '<span class="rl-time">' + when(o.donated_at) + '</span>' +
         (o.msg ? '<span class="rl-msg">' + esc(o.msg) + '</span>' : '') +
+        prog +
         '<button class="rl-all" data-order="' + esc(o.idx) + '">' +
         (picked === o.items.length ? '전체 해제' : '전체 선택') + '</button>' +
         '</div>' + items + '</div>';
@@ -253,7 +358,6 @@
         });
         state.anchor = all ? null : o.idx;
         renderList();
-        placeDock();
       });
     });
 
@@ -281,7 +385,7 @@
       return;
     }
 
-    /* 선택이 남아있는 카드 중 마지막으로 건드린 곳, 없으면 첫 번째 */
+    /* 마지막으로 건드린 카드, 없으면 선택이 남아있는 첫 카드 */
     var target = state.anchor && document.querySelector('.rl-order[data-order="' + state.anchor + '"]');
     if (!target) {
       var first = Object.keys(state.sel)[0].split('::')[0];
@@ -349,13 +453,16 @@
           status: status,
           memo: memo || undefined,
           done_ref: ref || undefined,
+          image_url: state.image || undefined,
         },
       });
       say(targets.length + '개 ' + STATUS[status] + ' 처리했어요');
       state.sel = {};
       state.anchor = null;
+      state.image = '';
       dock.querySelector('#rlMemo').value = '';
       dock.querySelector('#rlRef').value = '';
+      renderDrop();
       await refresh();
     } catch (e) { say('처리 실패: ' + e.message); }
   }
@@ -439,17 +546,22 @@
     '.rl-id{color:#b0b8c1}',
     '.rl-amt{color:#1b64da;font-weight:600}',
     '.rl-msg{color:#8b95a1;font-style:italic}',
-    '.rl-all{margin-left:auto;border:0;background:none;color:#3182f6;font:inherit;font-size:12px;cursor:pointer}',
+    '.rl-prog{margin-left:auto;font-size:12px;padding:2px 9px;border-radius:999px;background:#f2f4f6;color:#6b7684}',
+    '.rl-prog.full{background:#e8f7ee;color:#0f8b4c}',
+    '.rl-all{border:0;background:none;color:#3182f6;font:inherit;font-size:12px;cursor:pointer}',
     '.rl-item{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;font-size:13px;cursor:pointer}',
     '.rl-item:hover{background:#f8f9fa}',
     '.rl-item.sel{background:#e8f3ff}',
     '.rl-label{font-weight:600;color:#333d4b}',
     '.rl-pct{color:#b0b8c1;font-size:12px}',
     '.rl-extra{color:#6b7684;font-size:12px}',
-    '.rl-st{margin-left:auto;font-size:12px;padding:2px 8px;border-radius:6px;background:#f2f4f6;color:#8b95a1}',
+    '.rl-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex:0 0 auto}',
+    '.rl-done-at{font-size:12px;color:#8b95a1;white-space:nowrap}',
+    '.rl-st{font-size:12px;padding:2px 8px;border-radius:6px;background:#f2f4f6;color:#8b95a1;white-space:nowrap}',
     '.rl-st.rl-pending{background:#fff3e0;color:#c56b00}',
     '.rl-st.rl-done{background:#e8f7ee;color:#0f8b4c}',
-    '.rl-ref{font-size:12px;color:#3182f6}',
+    '.rl-ref{font-size:12px;color:#3182f6;white-space:nowrap}',
+    '.rl-shot img{width:26px;height:26px;object-fit:cover;border-radius:6px;border:1px solid #e5e8eb;display:block}',
     '.rl-empty{text-align:center;color:#8b95a1;padding:36px 0;font-size:14px}',
     '.rl-help{font-size:13px;color:#6b7684;margin:-4px 0 12px}',
     '.rl-un-row{display:flex;align-items:center;gap:8px;padding:8px 10px;margin:0 -10px;border-radius:8px;border-bottom:1px solid #f2f4f6;transition:background .12s}',
@@ -463,15 +575,24 @@
     '.rl-k:hover{background:#f2f4f6}',
     '.rl-k.on{background:#3182f6;color:#fff;font-weight:600}',
     /* 처리 바 — 선택한 카드 바로 아래에 붙습니다 */
-    '.rl-dock{display:none;align-items:center;gap:8px;flex-wrap:wrap;',
+    '.rl-dock{display:none;flex-direction:column;gap:8px;',
     'margin:-4px 0 14px;padding:11px 13px;border-radius:12px;',
     'background:#f8fbff;border:1px solid #c9deff}',
     '.rl-dock.on{display:flex}',
+    '.rl-dock-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
     '.rl-count{font-size:13px;color:#1b64da;font-weight:600;white-space:nowrap}',
     '.rl-dock input{padding:8px 11px;border:1px solid #d1d6db;border-radius:8px;font:inherit;font-size:13px;background:#fff}',
     '.rl-dock #rlMemo{flex:3;min-width:220px}',
     '.rl-dock #rlRef{flex:2;min-width:160px}',
     '.rl-acts{display:flex;gap:6px;margin-left:auto}',
+    '.rl-drop{flex:1;display:flex;align-items:center;gap:9px;padding:9px 12px;',
+    'border:1px dashed #b9d3ff;border-radius:9px;background:#fff;cursor:pointer;transition:background .12s,border-color .12s}',
+    '.rl-drop:hover,.rl-drop.over{background:#eef6ff;border-color:#3182f6}',
+    '.rl-drop.busy{opacity:.6}',
+    '.rl-drop-txt{font-size:12px;color:#6b7684}',
+    '.rl-thumb{width:34px;height:34px;object-fit:cover;border-radius:7px;border:1px solid #e5e8eb}',
+    '.rl-thumb-x{margin-left:auto;border:0;background:none;color:#8b95a1;font-size:13px;cursor:pointer;padding:2px 4px}',
+    '.rl-thumb-x:hover{color:#d64545}',
   ].join('');
   document.head.appendChild(css);
 })();

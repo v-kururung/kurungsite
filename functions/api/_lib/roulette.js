@@ -288,15 +288,20 @@ async function list(request, env, admin) {
   if (status) { itemCond.push(`i.status = ?`); itemArgs.push(status); }
   const itemWhere = itemCond.length ? ` AND ${itemCond.join(' AND ')}` : '';
 
-  /* 화면에 뿌릴 때는 그 주문의 숙제를 전부 보여줍니다.
-     처리가 끝난 항목도 함께 보여야 진행 상황을 알 수 있으니까요. */
-  const showWhere = scope === 'task' ? ` AND kind NOT IN ('instant','meta')` : '';
+  /* 화면에도 같은 조건을 그대로 적용합니다.
+     대신 카드 머리에 그 후원의 전체 진행도(완료 n/전체 m)를 함께 내려줍니다. */
+  const showWhere = itemWhere.replace(/\bi\./g, '');
 
   const searchWhere = q ? ` AND (o.donor_name LIKE ? OR o.donor_id LIKE ?)` : '';
   const searchArgs = q ? [`%${q}%`, `%${q}%`] : [];
 
   const ordersQ = await env.DB.prepare(
-    `SELECT o.* FROM roulette_orders o
+    `SELECT o.*,
+       (SELECT COUNT(*) FROM roulette_items t
+         WHERE t.order_idx = o.idx AND t.kind NOT IN ('instant','meta')) AS task_total,
+       (SELECT COUNT(*) FROM roulette_items t
+         WHERE t.order_idx = o.idx AND t.kind NOT IN ('instant','meta') AND t.status = 'done') AS task_done
+       FROM roulette_orders o
       WHERE EXISTS (SELECT 1 FROM roulette_items i WHERE i.order_idx = o.idx${itemWhere})
       ${searchWhere}
       ORDER BY o.donated_at DESC
@@ -308,11 +313,11 @@ async function list(request, env, admin) {
 
   const ids = rows.map((r) => r.idx);
   const itemsQ = await env.DB.prepare(
-    `SELECT order_idx, seq, label, percent, kind, status, done_at, done_ref, memo, resolved_label
+    `SELECT order_idx, seq, label, percent, kind, status, done_at, done_ref, memo, resolved_label, image_url
        FROM roulette_items
       WHERE order_idx IN (${ids.map(() => '?').join(',')})${showWhere}
       ORDER BY seq`
-  ).bind(...ids).all();
+  ).bind(...ids, ...itemArgs).all();
 
   const grouped = new Map(ids.map((id) => [id, []]));
   itemsQ.results.forEach((it) => grouped.get(it.order_idx)?.push(it));
@@ -327,6 +332,8 @@ async function list(request, env, admin) {
       donated_at: o.donated_at,
       stream_start: o.stream_start,
       spin_count: o.spin_count,
+      task_total: o.task_total,
+      task_done: o.task_done,
       items: grouped.get(o.idx) || [],
     })),
     hasMore: rows.length === limit,
@@ -424,7 +431,7 @@ async function menuClassify(request, env) {
 
 /** 숙제 처리 상태 변경 (일괄 지원) */
 async function itemStatus(request, env) {
-  const { targets, status, done_ref, memo, resolved_label } = await request.json().catch(() => ({}));
+  const { targets, status, done_ref, memo, resolved_label, image_url } = await request.json().catch(() => ({}));
   if (!Array.isArray(targets) || targets.length === 0) return json({ error: 'bad_request' }, 400);
   if (!['pending', 'scheduled', 'done', 'void'].includes(status)) return json({ error: 'bad_status' }, 400);
 
@@ -436,16 +443,20 @@ async function itemStatus(request, env) {
       env.DB.prepare(
         `UPDATE roulette_items
             SET status         = ?1,
-                done_at        = CASE WHEN ?1 = 'done' THEN COALESCE(done_at, datetime('now')) ELSE NULL END,
+                done_at        = CASE WHEN ?1 = 'done'
+                                      THEN COALESCE(done_at, datetime('now', '+9 hours'))
+                                      ELSE NULL END,
                 done_ref       = COALESCE(?2, done_ref),
                 memo           = COALESCE(?3, memo),
-                resolved_label = COALESCE(?4, resolved_label)
-          WHERE order_idx = ?5 AND seq = ?6`
+                resolved_label = COALESCE(?4, resolved_label),
+                image_url      = COALESCE(?5, image_url)
+          WHERE order_idx = ?6 AND seq = ?7`
       ).bind(
         status,
         keep(done_ref),
         keep(t.memo ?? memo),
         keep(t.resolved_label ?? resolved_label),
+        keep(t.image_url ?? image_url),
         String(t.order_idx),
         Number(t.seq)
       )
