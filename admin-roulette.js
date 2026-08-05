@@ -1,13 +1,10 @@
 /* ═══════════════════════════════════════════════════════════
-   룰렛 숙제 관리 — admin.html 에 붙는 탭
+   룰렛 숙제 관리 — admin.html 의 🎯 룰렛 숙제 탭
 
-   admin.html 수정 3곳:
-   1) 탭 버튼 추가
-      <button data-t="roulette" onclick="tab('roulette')">🎯 룰렛 숙제</button>
-   2) 패널 자리 추가 (다른 .panel 들 옆에)
-      <div class="panel" id="p-roulette"></div>
-   3) 맨 아래 인라인 <script> 다음 줄에
-      <script src="admin-roulette.js"></script>
+   admin.html 에는 이미 아래 세 가지가 들어가 있습니다.
+     · 탭 버튼   <button data-t="roulette" onclick="tab('roulette')">
+     · 패널 자리 <div class="panel" id="p-roulette"></div>
+     · 스크립트  <script src="admin-roulette.js"></script>
    ═══════════════════════════════════════════════════════════ */
 
 (function () {
@@ -16,9 +13,15 @@
     if (typeof DB !== 'undefined' && DB.token) return DB.token();
     return localStorage.getItem('adminToken') || '';
   };
-  var say = function (m) { if (typeof toast === 'function') toast(m); };
+  var say = function (m) { if (typeof toast === 'function') toast(m); else console.log(m); };
 
-  var state = { status: 'pending', q: '', offset: 0, orders: [], hasMore: false, sel: {}, menu: [] };
+  var KIND = { instant: '즉시', task: '숙제', meta: '제외', unknown: '미분류' };
+  var STATUS = { pending: '대기', scheduled: '예정', done: '완료', void: '제외' };
+
+  var state = {
+    status: 'pending', q: '', offset: 0,
+    orders: [], hasMore: false, sel: {}, menu: [], menuOpen: false,
+  };
 
   /* ───── 통신 ───── */
 
@@ -42,18 +45,20 @@
     });
   };
 
-  /* donated_at 은 위플랩이 준 한국 시간 문자열이라 그대로 자릅니다 */
+  /* donated_at 은 위플랩이 준 한국 시간이라 그대로 자릅니다 */
   var when = function (s) { return String(s || '').slice(0, 16); };
-
   var key = function (o, i) { return o + '::' + i; };
 
-  var STATUS_LABEL = { pending: '대기', scheduled: '예정', done: '완료', void: '제외' };
-
-  /* ───── 렌더 ───── */
+  /* ───── 화면 뼈대 ───── */
 
   function shell() {
     return [
       '<div class="box" id="rlUnknown" style="display:none"></div>',
+
+      '<div class="box">',
+      '  <h3 class="rl-fold" id="rlMenuHead">룰렛 항목 관리 <span class="rl-arrow">▾</span></h3>',
+      '  <div id="rlMenu" style="display:none"></div>',
+      '</div>',
 
       '<div class="box">',
       '  <h3>룰렛 숙제</h3>',
@@ -92,6 +97,8 @@
     ].join('');
   }
 
+  /* ───── 미분류 안내 ───── */
+
   function renderUnknown() {
     var box = document.getElementById('rlUnknown');
     var un = state.menu.filter(function (m) { return m.kind === 'unknown'; });
@@ -101,30 +108,74 @@
     box.innerHTML =
       '<h3>분류가 필요한 항목 ' + un.length + '개</h3>' +
       '<p class="rl-help">방송 중에 바로 끝나는 건 <b>즉시</b>, 나중에 해줘야 하는 건 <b>숙제</b>, ' +
-      '다음 룰렛 2배처럼 해줄 일이 없는 건 <b>제외</b>를 눌러주세요.</p>' +
-      '<div class="rl-un">' +
-      un.map(function (m) {
-        return '<div class="rl-un-row"><span class="rl-un-name">' + esc(m.label) + '</span>' +
-          '<button class="btn sub" data-k="instant" data-key="' + esc(m.label_key) + '">즉시</button>' +
-          '<button class="btn sub" data-k="task" data-key="' + esc(m.label_key) + '">숙제</button>' +
-          '<button class="btn sub" data-k="meta" data-key="' + esc(m.label_key) + '">제외</button></div>';
-      }).join('') +
-      '</div>';
+      '다음 룰렛 2배처럼 해줄 일이 없는 건 <b>제외</b>를 눌러주세요. 나중에 언제든 바꿀 수 있어요.</p>' +
+      '<div class="rl-un">' + un.map(row).join('') + '</div>';
+    bindKindButtons(box);
+  }
 
-    box.querySelectorAll('button[data-k]').forEach(function (b) {
+  /* ───── 항목 관리 (분류 수정) ───── */
+
+  function row(m) {
+    var seg = ['instant', 'task', 'meta'].map(function (k) {
+      return '<button class="rl-k' + (m.kind === k ? ' on' : '') + '" data-k="' + k +
+        '" data-key="' + esc(m.label_key) + '">' + KIND[k] + '</button>';
+    }).join('');
+    return '<div class="rl-un-row">' +
+      '<span class="rl-un-name">' + esc(m.label) + '</span>' +
+      '<span class="rl-kseg">' + seg + '</span></div>';
+  }
+
+  function renderMenu() {
+    var wrap = document.getElementById('rlMenu');
+    if (state.menu.length === 0) {
+      wrap.innerHTML = '<p class="rl-empty">아직 등록된 항목이 없어요</p>';
+      return;
+    }
+    var order = { unknown: 0, task: 1, instant: 2, meta: 3 };
+    var sorted = state.menu.slice().sort(function (a, b) {
+      return (order[a.kind] - order[b.kind]) || String(a.label).localeCompare(String(b.label), 'ko');
+    });
+    wrap.innerHTML =
+      '<p class="rl-help">분류를 바꾸면 앞으로 들어올 결과에 적용됩니다. ' +
+      '이미 쌓인 기록까지 바꿀지는 누를 때 물어봐요.</p>' +
+      sorted.map(row).join('');
+    bindKindButtons(wrap);
+  }
+
+  function bindKindButtons(root) {
+    root.querySelectorAll('button[data-k]').forEach(function (b) {
       b.addEventListener('click', function () {
-        classify(b.dataset.key, b.dataset.k);
+        var m = state.menu.filter(function (x) { return x.label_key === b.dataset.key; })[0];
+        if (m && m.kind === b.dataset.k) return;
+        classify(b.dataset.key, b.dataset.k, m ? m.kind : 'unknown');
       });
     });
   }
 
-  async function classify(label_key, kind) {
+  async function classify(label_key, kind, prev) {
+    var reapply = false;
+
+    /* 이미 분류돼 있던 항목이면 과거 기록 처리 방침을 묻습니다 */
+    if (prev && prev !== 'unknown') {
+      reapply = confirm(
+        label_key + ' : ' + KIND[prev] + ' → ' + KIND[kind] + '\n\n' +
+        '이미 쌓인 기록도 함께 바꿀까요?\n' +
+        '자동으로 처리된 것만 바꾸고, 비고나 다시보기 링크를 남긴 건은 그대로 둡니다.\n\n' +
+        '취소를 누르면 앞으로 들어올 결과에만 적용돼요.'
+      );
+    }
+
     try {
-      await api('/menu', { method: 'POST', body: { label_key: label_key, kind: kind } });
-      say(label_key + ' → ' + ({ instant: '즉시', task: '숙제', meta: '제외' }[kind]));
+      var r = await api('/menu', { method: 'POST', body: { label_key: label_key, kind: kind, reapply: reapply } });
+      var msg = label_key + ' → ' + KIND[kind];
+      if (r.moved) msg += ' · 기록 ' + r.moved + '개 반영';
+      if (r.kept) msg += ' · ' + r.kept + '개는 유지';
+      say(msg);
       await refresh();
     } catch (e) { say('분류 실패: ' + e.message); }
   }
+
+  /* ───── 숙제 목록 ───── */
 
   function renderList() {
     var wrap = document.getElementById('rlList');
@@ -139,16 +190,15 @@
     wrap.innerHTML = state.orders.map(function (o) {
       var items = o.items.map(function (it) {
         var k = key(o.idx, it.seq);
-        var pickable = it.status !== 'done' || state.status !== 'pending';
         var extra = [];
         if (it.resolved_label) extra.push('→ <b>' + esc(it.resolved_label) + '</b>');
         if (it.memo) extra.push(esc(it.memo));
         return '<label class="rl-item' + (state.sel[k] ? ' sel' : '') + '">' +
-          (pickable ? '<input type="checkbox" data-k="' + k + '"' + (state.sel[k] ? ' checked' : '') + '>' : '<span class="rl-dot"></span>') +
+          '<input type="checkbox" data-k="' + k + '"' + (state.sel[k] ? ' checked' : '') + '>' +
           '<span class="rl-label">' + esc(it.label) + '</span>' +
           '<span class="rl-pct">' + it.percent + '%</span>' +
           (extra.length ? '<span class="rl-extra">' + extra.join(' · ') + '</span>' : '') +
-          '<span class="rl-st rl-' + it.status + '">' + (STATUS_LABEL[it.status] || it.status) + '</span>' +
+          '<span class="rl-st rl-' + it.status + '">' + (STATUS[it.status] || it.status) + '</span>' +
           (it.done_ref ? '<a class="rl-ref" href="' + esc(it.done_ref) + '" target="_blank">다시보기</a>' : '') +
           '</label>';
       }).join('');
@@ -172,7 +222,8 @@
     });
 
     wrap.querySelectorAll('.rl-all').forEach(function (b) {
-      b.addEventListener('click', function () {
+      b.addEventListener('click', function (e) {
+        e.preventDefault();
         var o = state.orders.filter(function (x) { return x.idx === b.dataset.order; })[0];
         if (!o) return;
         o.items.forEach(function (it) { state.sel[key(o.idx, it.seq)] = true; });
@@ -199,20 +250,26 @@
   /* ───── 동작 ───── */
 
   async function refresh(keepOffset) {
-    if (!keepOffset) { state.offset = 0; state.orders = []; }
+    if (!keepOffset) { state.offset = 0; state.orders = []; state.sel = {}; }
     var qs = '?scope=task&limit=10&offset=' + state.offset +
       (state.status ? '&status=' + state.status : '') +
       (state.q ? '&q=' + encodeURIComponent(state.q) : '');
 
-    var res = await Promise.all([api('/stats'), api('/menu'), api('/list' + qs)]);
-    renderSum(res[0]);
-    state.menu = res[1].menu || [];
-    renderUnknown();
+    try {
+      var res = await Promise.all([api('/stats'), api('/menu'), api('/list' + qs)]);
+      renderSum(res[0]);
+      state.menu = res[1].menu || [];
+      renderUnknown();
+      if (state.menuOpen) renderMenu();
 
-    state.orders = state.offset === 0 ? res[2].orders : state.orders.concat(res[2].orders);
-    state.hasMore = res[2].hasMore;
-    renderList();
-    renderDock();
+      state.orders = state.offset === 0 ? res[2].orders : state.orders.concat(res[2].orders);
+      state.hasMore = res[2].hasMore;
+      renderList();
+      renderDock();
+    } catch (e) {
+      document.getElementById('rlList').innerHTML =
+        '<p class="rl-empty">불러오지 못했어요 — ' + esc(e.message) + '</p>';
+    }
   }
 
   async function apply(status) {
@@ -237,7 +294,7 @@
           done_ref: ref || undefined,
         },
       });
-      say(targets.length + '개 ' + STATUS_LABEL[status] + ' 처리했어요');
+      say(targets.length + '개 ' + STATUS[status] + ' 처리했어요');
       state.sel = {};
       ['rlMemo', 'rlSwap', 'rlRef'].forEach(function (id) { document.getElementById(id).value = ''; });
       await refresh();
@@ -254,11 +311,17 @@
     panel.innerHTML = shell();
     ready = true;
 
+    document.getElementById('rlMenuHead').addEventListener('click', function () {
+      state.menuOpen = !state.menuOpen;
+      document.getElementById('rlMenu').style.display = state.menuOpen ? '' : 'none';
+      this.querySelector('.rl-arrow').textContent = state.menuOpen ? '▴' : '▾';
+      if (state.menuOpen) renderMenu();
+    });
+
     document.getElementById('rlTabs').addEventListener('click', function (e) {
       var b = e.target.closest('button[data-s]');
       if (!b) return;
       state.status = b.dataset.s;
-      state.sel = {};
       this.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === b); });
       refresh();
     });
@@ -284,8 +347,7 @@
       } catch (e) { say('갱신 실패: ' + e.message); }
     });
 
-    var dock = document.getElementById('rlDock');
-    dock.addEventListener('click', function (e) {
+    document.getElementById('rlDock').addEventListener('click', function (e) {
       var b = e.target.closest('button');
       if (!b) return;
       if (b.dataset.st) apply(b.dataset.st);
@@ -299,7 +361,7 @@
   /* 탭을 처음 열 때 불러옵니다 */
   var origTab = window.tab;
   window.tab = function (n) {
-    origTab(n);
+    if (typeof origTab === 'function') origTab(n);
     if (n === 'roulette') ensure();
   };
 
@@ -312,6 +374,8 @@
     '.rl-chip b{margin-left:3px}',
     '.rl-chip.wait{background:#e8f3ff;color:#1b64da}',
     '.rl-chip.warn{background:#fff3e0;color:#c56b00}',
+    '.rl-fold{cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px}',
+    '.rl-arrow{font-size:12px;color:#b0b8c1}',
     '.rl-bar{display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap}',
     '.rl-bar input{flex:1;min-width:150px;padding:8px 11px;border:1px solid #e5e8eb;border-radius:8px;font:inherit;font-size:13px}',
     '.rl-seg{display:flex;border:1px solid #e5e8eb;border-radius:8px;overflow:hidden}',
@@ -327,7 +391,6 @@
     '.rl-item{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;font-size:13px;cursor:pointer}',
     '.rl-item:hover{background:#f8f9fa}',
     '.rl-item.sel{background:#e8f3ff}',
-    '.rl-dot{width:13px;height:13px;border-radius:50%;background:#e5e8eb;flex:0 0 auto}',
     '.rl-label{font-weight:600;color:#333d4b}',
     '.rl-pct{color:#b0b8c1;font-size:12px}',
     '.rl-extra{color:#6b7684;font-size:12px}',
@@ -337,9 +400,16 @@
     '.rl-ref{font-size:12px;color:#3182f6}',
     '.rl-empty{text-align:center;color:#8b95a1;padding:36px 0;font-size:14px}',
     '.rl-help{font-size:13px;color:#6b7684;margin:-4px 0 12px}',
-    '.rl-un-row{display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid #f2f4f6}',
+    '.rl-un-row{display:flex;align-items:center;gap:8px;padding:8px 10px;margin:0 -10px;border-radius:8px;border-bottom:1px solid #f2f4f6;transition:background .12s}',
+    '.rl-un-row:last-child{border-bottom:0}',
+    '.rl-un-row:hover{background:#f8f9fa}',
+    '.rl-un-row:hover .rl-kseg{border-color:#d1d6db}',
     '.rl-un-name{flex:1;font-weight:600;font-size:14px}',
-    '.rl-un-row .btn{padding:5px 12px;font-size:12px}',
+    '.rl-kseg{display:flex;border:1px solid #e5e8eb;border-radius:8px;overflow:hidden;flex:0 0 auto;transition:border-color .12s}',
+    '.rl-k{padding:6px 13px;border:0;background:#fff;font:inherit;font-size:12px;color:#8b95a1;cursor:pointer}',
+    '.rl-k+.rl-k{border-left:1px solid #e5e8eb}',
+    '.rl-k:hover{background:#f2f4f6}',
+    '.rl-k.on{background:#3182f6;color:#fff;font-weight:600}',
     '.rl-dock{position:sticky;bottom:0;margin-top:14px;display:none}',
     '.rl-dock.on{display:block}',
     '.rl-dock-in{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 14px;border-radius:12px;background:#fff;border:1px solid #d1d6db;box-shadow:0 -2px 16px rgba(0,0,0,.08)}',

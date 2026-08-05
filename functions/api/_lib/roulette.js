@@ -346,9 +346,16 @@ async function menuList(env) {
   return json({ menu: r.results });
 }
 
-/** 항목 분류 확정 + 아직 미분류로 남아있는 과거 결과에 소급 적용 */
+/**
+ * 항목 분류 확정.
+ *
+ * 기본 동작은 아직 미분류로 남아있는 과거 결과에만 소급 적용합니다.
+ * reapply: true 를 보내면 이미 분류된 기록까지 다시 맞추는데,
+ * 이때도 "자동으로 처리된 것"만 건드립니다.
+ * 비고·다시보기 링크·교체 기록이 있으면 직접 손댄 것으로 보고 그대로 둡니다.
+ */
 async function menuClassify(request, env) {
-  const { label_key, kind } = await request.json().catch(() => ({}));
+  const { label_key, kind, reapply } = await request.json().catch(() => ({}));
   if (!label_key || !['instant', 'task', 'meta'].includes(kind)) return json({ error: 'bad_request' }, 400);
 
   // instant = 방송 중 즉시 처리 → 바로 완료
@@ -356,9 +363,26 @@ async function menuClassify(request, env) {
   // task    = 나중에 해줘야 하는 숙제 → 대기
   const statusFor = { instant: 'done', meta: 'void', task: 'pending' }[kind];
 
-  await env.DB.batch([
-    env.DB.prepare(`UPDATE roulette_menu SET kind = ?1 WHERE label_key = ?2`).bind(kind, label_key),
-    env.DB.prepare(
+  await env.DB.prepare(`UPDATE roulette_menu SET kind = ?1 WHERE label_key = ?2`)
+    .bind(kind, label_key).run();
+
+  const backfill = await env.DB.prepare(
+    `UPDATE roulette_items
+        SET kind    = ?1,
+            status  = ?3,
+            done_at = CASE WHEN ?1 = 'instant'
+                           THEN (SELECT donated_at FROM roulette_orders WHERE idx = order_idx)
+                           ELSE NULL END
+      WHERE label_key = ?2
+        AND kind = 'unknown'
+        AND status = 'pending'`
+  ).bind(kind, label_key, statusFor).run();
+
+  let moved = backfill.meta?.changes ?? 0;
+  let kept = 0;
+
+  if (reapply) {
+    const re = await env.DB.prepare(
       `UPDATE roulette_items
           SET kind    = ?1,
               status  = ?3,
@@ -366,12 +390,21 @@ async function menuClassify(request, env) {
                              THEN (SELECT donated_at FROM roulette_orders WHERE idx = order_idx)
                              ELSE NULL END
         WHERE label_key = ?2
-          AND kind = 'unknown'
-          AND status = 'pending'`
-    ).bind(kind, label_key, statusFor),
-  ]);
+          AND kind <> ?1
+          AND memo IS NULL AND done_ref IS NULL AND resolved_label IS NULL
+          AND (   (kind = 'instant' AND status = 'done')
+               OR (kind = 'meta'    AND status = 'void')
+               OR (kind = 'task'    AND status = 'pending') )`
+    ).bind(kind, label_key, statusFor).run();
+    moved += re.meta?.changes ?? 0;
+  }
 
-  return json({ ok: true });
+  const left = await env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM roulette_items WHERE label_key = ?1 AND kind <> ?2`
+  ).bind(label_key, kind).first();
+  kept = left?.n ?? 0;
+
+  return json({ ok: true, moved, kept });
 }
 
 /** 숙제 처리 상태 변경 (일괄 지원) */
