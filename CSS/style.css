@@ -21,7 +21,7 @@ a{color:inherit;text-decoration:none}
 .top{position:sticky;top:0;z-index:20;background:var(--page-blur);
   backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
 .top .wrap{display:flex;align-items:center;justify-content:space-between;height:70px}
-.logo{font-family:var(--disp);font-weight:400;font-size:28px;color:var(--ink)}
+.logo{font-family:var(--disp);font-weight:400;font-size:31px;color:var(--ink);letter-spacing:.01em}
 .menu{display:flex;gap:34px}
 .menu a{font-size:15px;color:var(--sub);position:relative;padding:4px 0;transition:color .2s}
 .menu a:hover{color:var(--pink-deep)}
@@ -35,10 +35,10 @@ a{color:inherit;text-decoration:none}
   margin-bottom:13px;flex-wrap:wrap}
 .stitle{display:flex;align-items:baseline;gap:11px}
 .stitle .mark{align-self:center;flex-shrink:0;color:var(--pink);font-size:14px;line-height:1}
-.stitle h2{font-family:var(--disp);font-weight:400;font-size:20px;color:var(--ink);
+.stitle h2{font-family:var(--disp);font-weight:400;font-size:22px;color:var(--ink);
   letter-spacing:.5px;white-space:nowrap}
-.stitle .range{font-family:var(--latin);font-weight:500;font-size:13px;color:var(--sub);letter-spacing:.3px}
-.shead .live{font-size:13px;color:var(--sub);display:flex;align-items:center;gap:6px;
+.stitle .range{font-family:var(--latin);font-weight:500;font-size:14px;color:var(--sub);letter-spacing:.3px}
+.shead .live{font-size:14px;color:var(--sub);display:flex;align-items:center;gap:6px;
   flex-shrink:0;cursor:pointer}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--pink);
   box-shadow:0 0 0 4px var(--pink-glow);animation:pulse 2s infinite}
@@ -47,24 +47,24 @@ a{color:inherit;text-decoration:none}
 /* ───── 주간 일정 ───── */
 .week{display:grid;grid-template-columns:repeat(7,1fr);gap:12px}
 .day{background:var(--card);border-radius:16px;padding:11px 8px 12px;text-align:center;
-  box-shadow:var(--shadow);min-height:128px;display:flex;flex-direction:column;
+  box-shadow:var(--shadow);min-height:142px;display:flex;flex-direction:column;
   align-items:center;transition:transform .2s}
 .day:hover{transform:translateY(-4px)}
-.day .dow{font-size:12px;color:var(--sub)}
+.day .dow{font-size:14px;color:var(--sub)}
 .day.sun .dow{color:var(--pink-deep)}
 .day.sat .dow{color:var(--sat)}
-.day .date{font-family:var(--disp);font-size:18px;margin-top:1px;color:var(--ink)}
-.day .evt{position:relative;margin-top:auto;width:100%;height:58px;padding:6px 8px;
+.day .date{font-family:var(--disp);font-size:21px;margin-top:1px;color:var(--ink)}
+.day .evt{position:relative;margin-top:auto;width:100%;height:68px;padding:6px 8px;
   border-radius:11px;background:var(--page);display:flex;align-items:center;
   justify-content:center;overflow:hidden}
 .day .evt-in{display:flex;flex-direction:column;align-items:center;gap:5px;width:100%}
-.day .etime{color:var(--pink-deep);font-family:var(--latin);font-weight:600;font-size:11px;line-height:1.1}
-.day .etitle{font-size:12.5px;line-height:1.3;color:var(--ink);text-align:center;
+.day .etime{color:var(--pink-deep);font-family:var(--latin);font-weight:600;font-size:14px;line-height:1.1}
+.day .etitle{font-size:14px;line-height:1.3;color:var(--ink);text-align:center;
   word-break:keep-all;overflow-wrap:break-word;
   display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .day .evt .emore{position:absolute;top:4px;right:4px;background:var(--pink);color:#fff;
-  font-family:var(--latin);font-weight:600;font-size:10px;line-height:1;
-  padding:3px 6px;border-radius:10px;box-shadow:0 2px 5px var(--pink-glow)}
+  font-family:var(--latin);font-weight:600;font-size:14px;line-height:1;
+  padding:2px 6px;border-radius:10px;box-shadow:0 2px 5px var(--pink-glow)}
 .day .evt.more{cursor:pointer}
 .day .evt.more:hover{background:var(--pink-soft)}
 .day.today .evt .emore,.day.special .evt .emore{background:rgba(255,255,255,.9);color:var(--pink-deep)}
@@ -88,9 +88,9 @@ a{color:inherit;text-decoration:none}
 
 /* 섹션 이름표 — 덩어리를 눈에 보이게 나눕니다 */
 .eyebrow{display:flex;align-items:center;gap:7px;margin-bottom:14px;
-  font-family:var(--latin);font-weight:800;font-size:12px;letter-spacing:.2em;
+  font-family:var(--latin);font-weight:800;font-size:14px;letter-spacing:.2em;
   text-transform:uppercase;color:var(--pink-deep)}
-.eyebrow::before{content:"\2726";font-size:11px;line-height:1}
+.eyebrow::before{content:"\2726";font-size:14px;line-height:1}
 .pblock{margin-top:30px}
 
 /* 사진 — 뒤에 살짝 어긋난 판을 깔아 평평함을 덜어냅니다 */
@@ -109,17 +109,17 @@ a{color:inherit;text-decoration:none}
 .profile.wide .pshot::before{inset:14px -10px -14px 10px}
 
 .pinfo{min-width:0}
-.pinfo h2{font-family:var(--disp);font-weight:800;font-size:40px;letter-spacing:-.03em;
-  line-height:1.12;margin:0 0 9px;color:var(--ink)}
+.pinfo h2{font-family:var(--disp);font-weight:400;font-size:46px;letter-spacing:-.01em;
+  line-height:1.15;margin:0 0 10px;color:var(--ink)}
 .pinfo h2 span{color:var(--pink-deep)}
-.hearts{color:var(--pink);letter-spacing:5px;font-size:13px}
+.hearts{color:var(--pink);letter-spacing:5px;font-size:14px}
 
 /* 항목 — 왼쪽 라벨과 오른쪽 값의 역할이 분명하게 갈리도록 */
 .rows{display:grid}
 .rows .r{display:grid;grid-template-columns:92px 1fr;gap:20px;align-items:baseline;
   padding:14px 0;border-bottom:1px solid var(--line);min-width:0}
 .rows .r:last-child{border-bottom:0;padding-bottom:0}
-.rows .k{font-size:12.5px;font-weight:700;color:var(--sub);letter-spacing:.04em;
+.rows .k{font-size:14px;font-weight:700;color:var(--sub);letter-spacing:.04em;
   word-break:keep-all}
 .rows .v{font-size:16.5px;font-weight:600;color:var(--ink);line-height:1.5;
   word-break:keep-all;overflow-wrap:anywhere}
@@ -127,7 +127,7 @@ a{color:inherit;text-decoration:none}
 
 /* 나열형 값은 태그로 */
 .chips{display:inline-flex;flex-wrap:wrap;gap:6px;vertical-align:middle}
-.chips span{font-size:13.5px;font-weight:600;color:var(--pink-deep);
+.chips span{font-size:14px;font-weight:600;color:var(--pink-deep);
   background:var(--pink-soft);padding:4px 12px;border-radius:20px;line-height:1.45}
 
 /* 값이 주소면 링크 칩으로 */
@@ -137,10 +137,10 @@ a{color:inherit;text-decoration:none}
 .vlink:hover{background:var(--pink);color:#fff}
 
 .dday{display:inline-block;margin-left:7px;background:var(--pink);color:#fff;
-  font-family:var(--latin);font-weight:700;font-size:11.5px;padding:2px 9px;border-radius:20px;
+  font-family:var(--latin);font-weight:700;font-size:14px;padding:2px 9px;border-radius:20px;
   vertical-align:middle;letter-spacing:.3px}
 .bubble{margin-top:16px;background:var(--accent-soft);border-radius:18px 18px 18px 5px;
-  padding:12px 18px;font-family:var(--hand);font-size:16px;font-weight:600;line-height:1.5;
+  padding:11px 18px;font-family:var(--hand);font-size:21px;font-weight:400;line-height:1.45;
   color:var(--ink);display:inline-block}
 
 /* 링크는 왼쪽 열에서 세로로 쌓입니다 */
@@ -183,13 +183,13 @@ a{color:inherit;text-decoration:none}
 .vtitle{font-size:16.5px;line-height:1.35;color:var(--ink);word-break:keep-all;overflow-wrap:break-word;
   display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
   min-height:2.7em}
-.vdate{font-family:var(--latin);font-size:13px;color:var(--sub);letter-spacing:.3px}
+.vdate{font-family:var(--latin);font-size:14px;color:var(--sub);letter-spacing:.3px}
 .vtags{display:flex;flex-wrap:wrap;gap:6px;height:23px;overflow:hidden}
-.vtags span{background:var(--pink-soft);color:var(--pink-deep);font-size:12px;padding:3px 10px;border-radius:20px}
+.vtags span{background:var(--pink-soft);color:var(--pink-deep);font-size:14px;padding:3px 10px;border-radius:20px}
 /* '다시보기'와 버튼을 한 줄에 — 라벨 따로 한 줄을 쓰지 않습니다 */
 .vlinks{display:flex;align-items:center;gap:8px;margin-top:auto}
-.vlinks .vlabel{font-size:12.5px;color:var(--sub);margin-right:3px;flex-shrink:0}
-.vlinks a{display:flex;align-items:center;gap:6px;font-size:13px;padding:8px 14px;
+.vlinks .vlabel{font-size:14px;color:var(--sub);margin-right:3px;flex-shrink:0}
+.vlinks a{display:flex;align-items:center;gap:6px;font-size:14px;padding:8px 14px;
   border-radius:12px;background:var(--page);color:var(--ink);transition:.2s}
 .vlinks a:hover{background:var(--sub2)}
 .vlinks a img{width:15px;height:15px;object-fit:contain}
@@ -211,7 +211,7 @@ a{color:inherit;text-decoration:none}
 
 /* ───── 화보 뷰어 ───── */
 .mhead{text-align:center;margin-bottom:16px}
-.mhead .en{font-family:var(--latin);font-weight:600;font-size:11px;letter-spacing:3px;
+.mhead .en{font-family:var(--latin);font-weight:600;font-size:14px;letter-spacing:3px;
   text-transform:uppercase;color:var(--pink-deep)}
 .mhead h2{font-family:var(--disp);font-weight:400;font-size:22px;color:var(--ink);margin-top:2px}
 .viewer{background:var(--card);border:1px solid var(--line);border-radius:24px;
@@ -262,7 +262,7 @@ a{color:inherit;text-decoration:none}
   padding:12px 14px;font-family:var(--body);font-size:14px;margin-bottom:10px;
   background:var(--page);color:var(--ink);resize:vertical;outline:none}
 .modal input:focus,.modal textarea:focus{border-color:var(--pink)}
-.astat{font-size:13px;color:var(--pink-deep);min-height:17px;margin:2px 0 8px}
+.astat{font-size:14px;color:var(--pink-deep);min-height:17px;margin:2px 0 8px}
 .mbtns{display:flex;gap:10px;margin-top:4px}
 .mbtns button{flex:1;border:none;border-radius:14px;padding:12px;font-family:var(--body);
   font-size:14px;cursor:pointer}

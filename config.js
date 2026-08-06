@@ -48,9 +48,9 @@ window.SITE_CONFIG = {
         본문은 읽기 좋은 고딕으로 두었습니다.
         전부 손글씨로 바꾸고 싶으면 body 도 'OmyuPretty' 로 바꾸세요. */
   fonts: {
-    display : 'Pretendard',     // 로고, 제목, 이름
+    display : 'OmyuPretty',     // 로고, 제목, 이름 (오뮤 다예쁨체)
     body    : 'Pretendard',     // 본문
-    hand    : 'Pretendard',     // 말풍선
+    hand    : 'OmyuPretty',     // 말풍선
     latin   : 'Pretendard',     // 영문, 숫자
 
     /* 구글 폰트가 아닌 웹폰트 — family 이름을 위 칸에 쓰면 적용됩니다.
@@ -111,7 +111,7 @@ window.SITE_CONFIG = {
            비워두면 버튼이 흐리게 표시되고 눌리지 않습니다 */
   links: [
     { icon: 'images/logo/soop.png',    label: '숲',     url: 'https://www.sooplive.com/station/kururung' },
-    { icon: 'images/logo/cafe.png',    label: '네이버 카페', url: 'https://cafe.naver.com/vkururung' },   /* ← 카페 주소를 넣어주세요 */
+    { icon: 'images/logo/cafe.png',    label: '네이버 카페', url: '' },   /* ← 카페 주소를 넣어주세요 */
     { icon: 'images/logo/youtube.png', label: '유튜브',  url: 'https://www.youtube.com/@%EC%BF%A0%EB%A3%BDv' },
     { icon: '✉️',          label: '문의',    url: 'inquiry' }
   ],
