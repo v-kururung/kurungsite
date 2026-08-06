@@ -48,15 +48,22 @@ window.SITE_CONFIG = {
         본문은 읽기 좋은 고딕으로 두었습니다.
         전부 손글씨로 바꾸고 싶으면 body 도 'OmyuPretty' 로 바꾸세요. */
   fonts: {
-    display : 'OmyuPretty',     // 로고, 제목, 이름
-    body    : 'Gowun Dodum',    // 본문
-    hand    : 'OmyuPretty',     // 손글씨 (말풍선)
-    latin   : 'Poppins',        // 영문, 숫자
+    display : 'Pretendard',     // 로고, 제목, 이름
+    body    : 'Pretendard',     // 본문
+    hand    : 'Pretendard',     // 말풍선
+    latin   : 'Pretendard',     // 영문, 숫자
 
-    /* 구글 폰트가 아닌 웹폰트 — family 이름을 위 칸에 그대로 쓰면 적용됩니다 */
+    /* 구글 폰트가 아닌 웹폰트 — family 이름을 위 칸에 쓰면 적용됩니다.
+       css 항목은 스타일시트 주소, url 항목은 폰트 파일(woff2) 주소예요. */
     webfonts: [
       {
-        family: 'OmyuPretty',   // 오뮤 다예쁨체 (오뮤다이어리 x 보이저엑스, 상업용 무료)
+        family: 'Pretendard',
+        css   : 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-dynamic-subset.css'
+      },
+      {
+        /* 오뮤 다예쁨체 — 손글씨 느낌이 필요할 때 hand 에 'OmyuPretty' 를 넣어 쓰세요.
+           (오뮤다이어리 x 보이저엑스, 상업용 무료) */
+        family: 'OmyuPretty',
         url   : 'https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2304-01@1.0/omyu_pretty.woff2'
       }
     ]
@@ -102,8 +109,8 @@ window.SITE_CONFIG = {
      icon: 이미지 파일명 또는 이모지
      url : 주소 ('inquiry' 로 두면 문의창이 열립니다) */
   links: [
-    { icon: 'soop.png',    label: '숲',     url: 'https://www.sooplive.com/station/kururung' },
-    { icon: 'youtube.png', label: '유튜브',  url: 'https://www.youtube.com/@%EC%BF%A0%EB%A3%BDv' },
+    { icon: 'images/logo/soop.png',    label: '숲',     url: 'https://www.sooplive.com/station/kururung' },
+    { icon: 'images/logo/youtube.png', label: '유튜브',  url: 'https://www.youtube.com/@%EC%BF%A0%EB%A3%BDv' },
     { icon: '✉️',          label: '문의',    url: 'inquiry' }
   ],
 

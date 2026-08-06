@@ -38,11 +38,9 @@
       <div class="hearts" id="pHearts"></div>
       <div class="rows" id="pRows"></div>
       <div class="bubble" id="pBubble"></div>
+      <nav class="links" id="links"></nav>
     </div>
   </section>
-
-  <!-- 링크 -->
-  <nav class="links" id="links"></nav>
 
 </div></main>
 
@@ -96,9 +94,21 @@ renderLinks('#links');
   }
 
   document.getElementById('pRows').innerHTML=rows.map(function(r){
-    var v=r.highlight ? '<b>'+esc(r.value)+'</b>' : esc(r.value);
+    var raw=String(r.value==null?'':r.value);
+    var isUrl=/^https?:\/\//i.test(raw), v;
+
+    if(isUrl){
+      /* 주소를 그대로 노출하면 지저분해서 링크 칩으로 바꿉니다 */
+      v='<a class="vlink" href="'+esc(raw)+'" target="_blank" rel="noopener">바로가기 ↗</a>';
+    }else{
+      v=r.highlight ? '<b>'+esc(raw)+'</b>' : esc(raw);
+    }
     if(r.dday) v+=' <span class="dday" id="dday"></span>';
-    return '<div class="r"><span class="k">'+esc(r.key)+'</span><span class="v">'+v+'</span></div>';
+
+    /* 값이 길면 한 줄을 다 씁니다 */
+    var full=(!isUrl && raw.length>20) ? ' full' : '';
+    return '<div class="r'+full+'"><span class="k">'+esc(r.key)+'</span>'
+         + '<span class="v">'+v+'</span></div>';
   }).join('');
 
   /* ── 말풍선 ── */

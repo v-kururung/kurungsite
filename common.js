@@ -57,20 +57,32 @@ function applyTheme(){
   r.setProperty('--portrait-bg',  'radial-gradient(120% 110% at 50% 20%,'+t.accentSoft+','+t.mainSoft+')');
   r.setProperty('--sat',          '#d99a3c');
 
-  /* 폰트 */
-  r.setProperty('--disp',  '"'+f.display+'",sans-serif');
-  r.setProperty('--body',  '"'+f.body+'",sans-serif');
-  r.setProperty('--hand',  '"'+f.hand+'",cursive');
-  r.setProperty('--latin', '"'+f.latin+'",sans-serif');
+  /* 폰트 — 이모지는 시스템 글꼴로 넘겨야 컬러로 나옵니다 */
+  var EMOJI='"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji"';
+  r.setProperty('--disp',  '"'+f.display+'",'+EMOJI+',sans-serif');
+  r.setProperty('--body',  '"'+f.body+'",'+EMOJI+',sans-serif');
+  r.setProperty('--hand',  '"'+f.hand+'",'+EMOJI+',cursive');
+  r.setProperty('--latin', '"'+f.latin+'",'+EMOJI+',sans-serif');
 
-  /* 직접 등록한 웹폰트 (구글 폰트에 없는 것) */
+  /* 직접 등록한 웹폰트 (구글 폰트에 없는 것)
+     css 가 있으면 스타일시트를 그대로 불러오고, url 이면 @font-face 를 만듭니다.
+     실제로 쓰는 폰트만 불러와서 필요 없는 요청을 줄입니다. */
   var web = f.webfonts || [];
-  if(web.length){
-    var face = web.map(function(w){
-      return '@font-face{font-family:"'+w.family+'";'
-           + 'src:url("'+w.url+'") format("'+(w.format||'woff2')+'");'
-           + 'font-weight:'+(w.weight||'normal')+';font-style:normal;font-display:swap}';
-    }).join('');
+  var using = [f.display,f.body,f.hand,f.latin];
+  var face = '';
+  web.forEach(function(w){
+    if(using.indexOf(w.family)<0) return;
+    if(w.css){
+      var l=document.createElement('link');
+      l.rel='stylesheet'; l.href=w.css;
+      document.head.appendChild(l);
+    }else if(w.url){
+      face += '@font-face{font-family:"'+w.family+'";'
+           +  'src:url("'+w.url+'") format("'+(w.format||'woff2')+'");'
+           +  'font-weight:'+(w.weight||'normal')+';font-style:normal;font-display:swap}';
+    }
+  });
+  if(face){
     var st=document.createElement('style');
     st.textContent=face;
     document.head.appendChild(st);
