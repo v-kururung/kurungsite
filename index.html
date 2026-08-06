@@ -54,37 +54,59 @@
 initPage('index.html');
 renderLinks('#links');
 
-/* 프로필 사진 — 관리자에서 바꾼 사진이 있으면 그걸 씁니다 */
+/* 프로필 — 관리자 페이지에서 저장한 값이 있으면 그쪽을 먼저 씁니다 */
 (async function(){
-  var p=CFG.profile||{}, src=p.image||'';
-  try{
-    var st=await DB.settings();
-    if(st && st.profile_image) src=st.profile_image;
-  }catch(e){ }
-  document.getElementById('portrait').innerHTML = src
-    ? '<img src="'+esc(src)+'" alt="'+esc(p.nameMain)+'" onerror="this.remove()">'
-    : '<div class="ph">&#129498;</div>';
-})();
+  var p=CFG.profile||{}, st={};
+  try{ st=(await DB.settings())||{}; }catch(e){ }
 
-/* 프로필 */
-(function(){
-  var p=CFG.profile||{};
+  /* ── 사진 ── */
+  var src = st.profile_image || p.image || '';
+  var box = document.getElementById('portrait');
+  if(src){
+    var img=new Image();
+    img.alt=fullName();
+    /* 가로로 긴 사진이면 프로필 카드를 위아래 배치로 바꿉니다 */
+    img.onload=function(){
+      if(img.naturalWidth > img.naturalHeight*1.15){
+        var sec=document.querySelector('.profile');
+        if(sec) sec.classList.add('wide');
+      }
+    };
+    img.onerror=function(){ box.innerHTML='<div class="ph">&#129498;</div>'; };
+    img.src=src;
+    box.innerHTML=''; box.appendChild(img);
+  }else{
+    box.innerHTML='<div class="ph">&#129498;</div>';
+  }
 
+  /* ── 이름 · 하트 ── */
   document.getElementById('pName').innerHTML =
     esc(p.nameMain)+(p.nameAccent?'<span>'+esc(p.nameAccent)+'</span>':'');
 
   var h=''; for(var i=0;i<(p.hearts||0);i++) h+='\u2665 ';
   document.getElementById('pHearts').textContent=h.trim();
 
-  document.getElementById('pRows').innerHTML=(p.rows||[]).map(function(r){
+  /* ── 항목 ── */
+  var rows = p.rows || [];
+  if(st.profile_rows){
+    try{
+      var saved=JSON.parse(st.profile_rows);
+      if(Array.isArray(saved)) rows=saved;
+    }catch(e){ }
+  }
+
+  document.getElementById('pRows').innerHTML=rows.map(function(r){
     var v=r.highlight ? '<b>'+esc(r.value)+'</b>' : esc(r.value);
     if(r.dday) v+=' <span class="dday" id="dday"></span>';
     return '<div class="r"><span class="k">'+esc(r.key)+'</span><span class="v">'+v+'</span></div>';
   }).join('');
 
+  /* ── 말풍선 ── */
   var b=document.getElementById('pBubble');
-  if(p.bubble) b.textContent=p.bubble; else b.style.display='none';
+  var bubble = st.profile_bubble || p.bubble;
+  if(bubble) b.textContent=bubble; else b.style.display='none';
 
+  /* ── D-day ── */
   var el=document.getElementById('dday');
   if(el && p.debutDate){
     var now=new Date(); now.setHours(0,0,0,0);

@@ -41,12 +41,25 @@ window.SITE_CONFIG = {
 
 
   /* ───── 3. 폰트 ─────
-     구글 폰트 이름 그대로 (fonts.google.com 에서 확인) */
+     이름만 적으면 구글 폰트에서 자동으로 불러옵니다 (fonts.google.com).
+     구글에 없는 폰트는 아래 webfonts 에 주소를 등록해두면 됩니다.
+
+     ※ 오뮤 다예쁨체는 손글씨 계열이라 제목·말풍선에 쓰고
+        본문은 읽기 좋은 고딕으로 두었습니다.
+        전부 손글씨로 바꾸고 싶으면 body 도 'OmyuPretty' 로 바꾸세요. */
   fonts: {
-    display : 'Jua',            // 로고, 제목
+    display : 'OmyuPretty',     // 로고, 제목, 이름
     body    : 'Gowun Dodum',    // 본문
-    hand    : 'Gamja Flower',   // 손글씨 (말풍선)
-    latin   : 'Poppins'         // 영문, 숫자
+    hand    : 'OmyuPretty',     // 손글씨 (말풍선)
+    latin   : 'Poppins',        // 영문, 숫자
+
+    /* 구글 폰트가 아닌 웹폰트 — family 이름을 위 칸에 그대로 쓰면 적용됩니다 */
+    webfonts: [
+      {
+        family: 'OmyuPretty',   // 오뮤 다예쁨체 (오뮤다이어리 x 보이저엑스, 상업용 무료)
+        url   : 'https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2304-01@1.0/omyu_pretty.woff2'
+      }
+    ]
   },
 
 
@@ -67,7 +80,8 @@ window.SITE_CONFIG = {
     nameAccent: 'v',             // 이름 뒤 강조 부분 (없으면 '')
     hearts    : 5,               // 하트 개수
 
-    /* 프로필 항목 — 자유롭게 추가/삭제/순서변경 가능
+    /* 프로필 항목 — 관리자 페이지에서 편집한 내용이 있으면 그쪽이 우선입니다.
+       여기 값은 관리자에서 아직 저장한 적 없을 때 쓰이는 기본값이에요.
        highlight: true  → 값을 강조색으로
        dday: true       → 값 옆에 D-day 뱃지 표시 */
     rows: [

@@ -82,28 +82,37 @@ a{color:inherit;text-decoration:none}
 .day.special .etitle{font-weight:700}
 
 /* ───── 프로필 ───── */
-.profile{display:grid;grid-template-columns:300px 1fr;gap:30px;align-items:stretch;
-  margin-top:34px;background:var(--card);border-radius:24px;padding:26px;box-shadow:var(--shadow)}
-.portrait{position:relative;height:100%;border-radius:22px;overflow:hidden;
+.profile{display:grid;grid-template-columns:330px 1fr;gap:34px;align-items:start;
+  margin-top:34px;background:var(--card);border-radius:24px;padding:28px;box-shadow:var(--shadow)}
+.portrait{position:relative;border-radius:20px;overflow:hidden;aspect-ratio:3/4;
   background:var(--portrait-bg);display:grid;place-items:center}
-.portrait img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.portrait img{width:100%;height:100%;object-fit:cover;display:block}
 .portrait .ph{font-size:78px;z-index:1}
-.pinfo{display:flex;flex-direction:column;justify-content:center}
+
+/* 가로형 사진이면 위아래로 배치합니다 — index.html 이 사진 비율을 보고 붙여줍니다 */
+.profile.wide{grid-template-columns:1fr;gap:26px}
+.profile.wide .portrait{aspect-ratio:16/9;max-height:400px}
+
+.pinfo{display:flex;flex-direction:column;justify-content:center;min-width:0}
 .pinfo .en{font-family:var(--latin);font-weight:600;font-size:11px;letter-spacing:3px;
   text-transform:uppercase;color:var(--pink-deep)}
-.pinfo h2{font-family:var(--disp);font-weight:400;font-size:29px;margin:2px 0 3px;color:var(--ink)}
+.pinfo h2{font-family:var(--disp);font-weight:400;font-size:34px;line-height:1.25;
+  margin:3px 0 5px;color:var(--ink)}
 .hearts{color:var(--pink);letter-spacing:3px;font-size:14px}
-.rows{margin-top:12px}
-.rows .r{display:flex;padding:8px 0;border-bottom:1px dashed var(--line);font-size:15px}
-.rows .r:last-of-type{border-bottom:none}
-.rows .k{width:110px;color:var(--sub);flex-shrink:0}
-.rows .v{color:var(--ink)}
+
+/* 항목 — 점선 대신 줄무늬로 구분해서 눈이 덜 피로합니다 */
+.rows{margin-top:18px;display:grid;gap:3px}
+.rows .r{display:grid;grid-template-columns:96px 1fr;align-items:baseline;gap:16px;
+  padding:11px 14px;border-radius:12px;font-size:16.5px;line-height:1.6}
+.rows .r:nth-child(odd){background:var(--page)}
+.rows .k{color:var(--sub);font-size:14.5px;letter-spacing:.2px;word-break:keep-all}
+.rows .v{color:var(--ink);word-break:keep-all;overflow-wrap:anywhere}
 .rows .v b{color:var(--pink-deep);font-weight:400}
 .dday{display:inline-block;margin-left:6px;background:var(--pink);color:#fff;
   font-family:var(--latin);font-weight:600;font-size:11.5px;padding:2px 9px;border-radius:20px;
   vertical-align:middle;letter-spacing:.3px}
-.bubble{margin-top:13px;background:var(--accent-soft);border-radius:16px 16px 16px 4px;
-  padding:9px 16px;font-family:var(--hand);font-size:22px;line-height:1.3;
+.bubble{margin-top:16px;background:var(--accent-soft);border-radius:16px 16px 16px 4px;
+  padding:11px 18px;font-family:var(--hand);font-size:23px;line-height:1.45;
   color:var(--ink);align-self:flex-start}
 
 /* ───── 링크 버튼 ───── */
@@ -246,10 +255,12 @@ footer .credit:hover{opacity:1}
 
 /* ───── 반응형 ───── */
 @media(max-width:860px){
-  .profile{grid-template-columns:1fr;align-items:center;text-align:center}
-  .portrait{max-width:280px;aspect-ratio:4/5;height:auto;margin:0 auto}
+  .profile{grid-template-columns:1fr;text-align:center}
+  .portrait{max-width:300px;aspect-ratio:4/5;margin:0 auto}
+  .profile.wide .portrait{max-width:100%;aspect-ratio:16/9}
   .pinfo{justify-content:flex-start}
-  .rows .r{justify-content:center}
+  .rows .r{grid-template-columns:1fr;gap:2px;padding:10px 12px}
+  .rows .k{font-size:13.5px}
   .bubble{align-self:center}
 }
 @media(max-width:680px){

@@ -63,14 +63,31 @@ function applyTheme(){
   r.setProperty('--hand',  '"'+f.hand+'",cursive');
   r.setProperty('--latin', '"'+f.latin+'",sans-serif');
 
-  /* 구글 폰트 로드 */
-  var fam=[f.display,f.body,f.hand].filter(Boolean)
-          .map(function(n){return 'family='+n.replace(/ /g,'+');}).join('&');
-  if(f.latin) fam+='&family='+f.latin.replace(/ /g,'+')+':wght@500;600';
-  var link=document.createElement('link');
-  link.rel='stylesheet';
-  link.href='https://fonts.googleapis.com/css2?'+fam+'&display=swap';
-  document.head.appendChild(link);
+  /* 직접 등록한 웹폰트 (구글 폰트에 없는 것) */
+  var web = f.webfonts || [];
+  if(web.length){
+    var face = web.map(function(w){
+      return '@font-face{font-family:"'+w.family+'";'
+           + 'src:url("'+w.url+'") format("'+(w.format||'woff2')+'");'
+           + 'font-weight:'+(w.weight||'normal')+';font-style:normal;font-display:swap}';
+    }).join('');
+    var st=document.createElement('style');
+    st.textContent=face;
+    document.head.appendChild(st);
+  }
+  var own = web.map(function(w){ return w.family; });
+  var isOwn = function(n){ return own.indexOf(n)>=0; };
+
+  /* 구글 폰트 로드 — 직접 등록한 폰트는 빼고 요청합니다 */
+  var fam=[f.display,f.body,f.hand].filter(Boolean).filter(function(n){ return !isOwn(n); })
+          .map(function(n){return 'family='+n.replace(/ /g,'+');});
+  if(f.latin && !isOwn(f.latin)) fam.push('family='+f.latin.replace(/ /g,'+')+':wght@500;600');
+  if(fam.length){
+    var link=document.createElement('link');
+    link.rel='stylesheet';
+    link.href='https://fonts.googleapis.com/css2?'+fam.join('&')+'&display=swap';
+    document.head.appendChild(link);
+  }
 
   document.title = T((CFG.site&&CFG.site.tabTitle) || '');
 }
