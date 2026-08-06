@@ -154,8 +154,13 @@ a{color:inherit;text-decoration:none}
 .links a{display:flex;align-items:center;gap:7px;font-size:15px;padding:10px 22px;
   border-radius:24px;background:var(--card);box-shadow:var(--shadow);color:var(--sub);transition:.2s}
 .links a:hover{color:#fff;background:var(--pink);transform:translateY(-2px)}
-.links a .ic{font-size:16px}
-.links a img.ic{width:18px;height:18px;object-fit:contain;display:block}
+.links a .ic,.links .off .ic{font-size:16px}
+.links a img.ic,.links .off img.ic{width:18px;height:18px;object-fit:contain;display:block}
+/* 주소를 아직 안 넣은 버튼 */
+.links .off{display:flex;align-items:center;gap:7px;font-size:15px;padding:10px 22px;
+  border-radius:24px;background:var(--card);box-shadow:var(--shadow);color:var(--sub);opacity:.5}
+.pside .links .off{justify-content:flex-start;font-size:14.5px;padding:10px 16px;
+  background:var(--page);border:1px solid var(--line);box-shadow:none}
 
 /* ───── 방송 카드 ───── */
 .search{position:relative;flex-shrink:0}

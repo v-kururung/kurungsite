@@ -107,9 +107,11 @@ window.SITE_CONFIG = {
 
   /* ───── 6. 링크 버튼 ─────
      icon: 이미지 파일명 또는 이모지
-     url : 주소 ('inquiry' 로 두면 문의창이 열립니다) */
+     url : 주소 ('inquiry' 로 두면 문의창이 열립니다)
+           비워두면 버튼이 흐리게 표시되고 눌리지 않습니다 */
   links: [
     { icon: 'images/logo/soop.png',    label: '숲',     url: 'https://www.sooplive.com/station/kururung' },
+    { icon: 'images/logo/cafe.png',    label: '네이버 카페', url: 'https://cafe.naver.com/vkururung' },   /* ← 카페 주소를 넣어주세요 */
     { icon: 'images/logo/youtube.png', label: '유튜브',  url: 'https://www.youtube.com/@%EC%BF%A0%EB%A3%BDv' },
     { icon: '✉️',          label: '문의',    url: 'inquiry' }
   ],

@@ -270,11 +270,14 @@ async function sendInquiry(){
 function renderLinks(sel){
   var box=document.querySelector(sel); if(!box) return;
   box.innerHTML=(CFG.links||[]).map(function(l){
-    var icon=/\.(png|jpg|jpeg|svg|webp|gif)$/i.test(l.icon)
+    var icon=/\.(png|jpg|jpeg|svg|webp|gif|ico|avif)$/i.test(l.icon)
       ? '<img class="ic" src="'+esc(l.icon)+'" alt="">'
       : '<span class="ic">'+esc(l.icon)+'</span>';
     if(l.url==='inquiry')
       return '<a href="#" onclick="openInquiry();return false;">'+icon+esc(l.label)+'</a>';
+    /* 주소를 아직 안 넣었으면 눌리지 않게 둡니다 */
+    if(!l.url)
+      return '<span class="off">'+icon+esc(l.label)+'</span>';
     return '<a href="'+esc(l.url)+'" target="_blank" rel="noopener">'+icon+esc(l.label)+'</a>';
   }).join('');
 }
