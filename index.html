@@ -31,14 +31,23 @@
 
   <!-- 프로필 -->
   <section class="profile">
-    <div class="portrait" id="portrait"></div>
+    <aside class="pside">
+      <div class="pshot"><div class="portrait" id="portrait"></div></div>
+      <div class="pblock">
+        <p class="eyebrow">Find me</p>
+        <nav class="links" id="links"></nav>
+      </div>
+    </aside>
+
     <div class="pinfo">
-      <div class="en">Profile</div>
+      <p class="eyebrow">Profile</p>
       <h2 id="pName"></h2>
       <div class="hearts" id="pHearts"></div>
-      <div class="rows" id="pRows"></div>
       <div class="bubble" id="pBubble"></div>
-      <nav class="links" id="links"></nav>
+      <div class="pblock">
+        <p class="eyebrow">About</p>
+        <div class="rows" id="pRows"></div>
+      </div>
     </div>
   </section>
 
@@ -94,20 +103,24 @@ renderLinks('#links');
   }
 
   document.getElementById('pRows').innerHTML=rows.map(function(r){
-    var raw=String(r.value==null?'':r.value);
-    var isUrl=/^https?:\/\//i.test(raw), v;
+    var raw=String(r.value==null?'':r.value).trim();
+    var parts=raw.split(/\s*[·,]\s*/).filter(Boolean);
+    var v;
 
-    if(isUrl){
+    if(/^https?:\/\//i.test(raw)){
       /* 주소를 그대로 노출하면 지저분해서 링크 칩으로 바꿉니다 */
       v='<a class="vlink" href="'+esc(raw)+'" target="_blank" rel="noopener">바로가기 ↗</a>';
+    }else if(parts.length>1){
+      /* 가운뎃점이나 쉼표로 나열한 값은 태그로 풀어줍니다 */
+      v='<span class="chips">'+parts.map(function(t){
+          return '<span>'+esc(t)+'</span>';
+        }).join('')+'</span>';
     }else{
       v=r.highlight ? '<b>'+esc(raw)+'</b>' : esc(raw);
     }
     if(r.dday) v+=' <span class="dday" id="dday"></span>';
 
-    /* 값이 길면 한 줄을 다 씁니다 */
-    var full=(!isUrl && raw.length>20) ? ' full' : '';
-    return '<div class="r'+full+'"><span class="k">'+esc(r.key)+'</span>'
+    return '<div class="r"><span class="k">'+esc(r.key)+'</span>'
          + '<span class="v">'+v+'</span></div>';
   }).join('');
 

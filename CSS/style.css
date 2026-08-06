@@ -61,7 +61,7 @@ a{color:inherit;text-decoration:none}
 .day .etime{color:var(--pink-deep);font-family:var(--latin);font-weight:600;font-size:11px;line-height:1.1}
 .day .etitle{font-size:12.5px;line-height:1.3;color:var(--ink);text-align:center;
   word-break:keep-all;overflow-wrap:break-word;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .day .evt .emore{position:absolute;top:4px;right:4px;background:var(--pink);color:#fff;
   font-family:var(--latin);font-weight:600;font-size:10px;line-height:1;
   padding:3px 6px;border-radius:10px;box-shadow:0 2px 5px var(--pink-glow)}
@@ -82,54 +82,72 @@ a{color:inherit;text-decoration:none}
 .day.special .etitle{font-weight:700}
 
 /* ───── 프로필 ───── */
-/* 사진을 카드 왼쪽 면에 붙여 카드 자체의 일부로 만듭니다 */
-.profile{display:grid;grid-template-columns:302px 1fr;align-items:stretch;
-  margin-top:34px;background:var(--card);border-radius:26px;overflow:hidden;
-  box-shadow:var(--shadow);min-height:432px}
-.portrait{position:relative;background:var(--portrait-bg);display:grid;place-items:center;overflow:hidden}
+.profile{display:grid;grid-template-columns:264px 1fr;gap:44px;align-items:start;
+  margin-top:34px;background:var(--card);border-radius:26px;padding:38px 42px;
+  box-shadow:var(--shadow)}
+
+/* 섹션 이름표 — 덩어리를 눈에 보이게 나눕니다 */
+.eyebrow{display:flex;align-items:center;gap:7px;margin-bottom:14px;
+  font-family:var(--latin);font-weight:800;font-size:12px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--pink-deep)}
+.eyebrow::before{content:"\2726";font-size:11px;line-height:1}
+.pblock{margin-top:30px}
+
+/* 사진 — 뒤에 살짝 어긋난 판을 깔아 평평함을 덜어냅니다 */
+.pside{display:flex;flex-direction:column}
+.pshot{position:relative}
+.pshot::before{content:"";position:absolute;inset:16px -14px -16px 14px;
+  border-radius:24px;background:var(--sub2);opacity:.55}
+.portrait{position:relative;aspect-ratio:3/4;border-radius:22px;overflow:hidden;
+  background:var(--portrait-bg);display:grid;place-items:center}
 .portrait img{width:100%;height:100%;object-fit:cover;object-position:50% 12%;display:block}
-.portrait .ph{font-size:78px}
+.portrait .ph{font-size:74px}
 
 /* 가로형 사진이면 위아래로 배치합니다 — index.html 이 사진 비율을 보고 붙여줍니다 */
-.profile.wide{grid-template-columns:1fr;min-height:0}
-.profile.wide .portrait{aspect-ratio:16/9;max-height:360px}
+.profile.wide{grid-template-columns:1fr;gap:32px}
+.profile.wide .portrait{aspect-ratio:16/9}
+.profile.wide .pshot::before{inset:14px -10px -14px 10px}
 
-.pinfo{display:flex;flex-direction:column;justify-content:center;padding:34px 38px;min-width:0}
-.pinfo .en{font-family:var(--latin);font-weight:700;font-size:11px;letter-spacing:.28em;
-  text-transform:uppercase;color:var(--pink-deep)}
-.pinfo h2{font-family:var(--disp);font-weight:800;font-size:38px;letter-spacing:-.02em;
-  line-height:1.15;margin:7px 0 9px;color:var(--ink)}
+.pinfo{min-width:0}
+.pinfo h2{font-family:var(--disp);font-weight:800;font-size:40px;letter-spacing:-.03em;
+  line-height:1.12;margin:0 0 9px;color:var(--ink)}
 .pinfo h2 span{color:var(--pink-deep)}
-.hearts{color:var(--pink);letter-spacing:4px;font-size:13px}
+.hearts{color:var(--pink);letter-spacing:5px;font-size:13px}
 
-/* 항목 — 라벨은 작게 위, 값은 굵게 아래. 두 칸씩 채웁니다 */
-.rows{margin-top:22px;display:grid;grid-template-columns:1fr 1fr;gap:9px}
-.rows .r{display:flex;flex-direction:column;gap:3px;min-width:0;
-  padding:12px 15px;border-radius:14px;background:var(--page);border:1px solid var(--line)}
-.rows .r.full{grid-column:1/-1}
-.rows .k{font-size:12px;font-weight:600;color:var(--sub);letter-spacing:.02em}
-.rows .v{font-size:16px;font-weight:600;color:var(--ink);line-height:1.45;
+/* 항목 — 왼쪽 라벨과 오른쪽 값의 역할이 분명하게 갈리도록 */
+.rows{display:grid}
+.rows .r{display:grid;grid-template-columns:92px 1fr;gap:20px;align-items:baseline;
+  padding:14px 0;border-bottom:1px solid var(--line);min-width:0}
+.rows .r:last-child{border-bottom:0;padding-bottom:0}
+.rows .k{font-size:12.5px;font-weight:700;color:var(--sub);letter-spacing:.04em;
+  word-break:keep-all}
+.rows .v{font-size:16.5px;font-weight:600;color:var(--ink);line-height:1.5;
   word-break:keep-all;overflow-wrap:anywhere}
-.rows .v b{color:var(--pink-deep);font-weight:700}
+.rows .v b{color:var(--pink-deep);font-weight:800}
 
-/* 값이 주소면 링크 칩으로 바뀝니다 */
+/* 나열형 값은 태그로 */
+.chips{display:inline-flex;flex-wrap:wrap;gap:6px;vertical-align:middle}
+.chips span{font-size:13.5px;font-weight:600;color:var(--pink-deep);
+  background:var(--pink-soft);padding:4px 12px;border-radius:20px;line-height:1.45}
+
+/* 값이 주소면 링크 칩으로 */
 .vlink{display:inline-flex;align-items:center;gap:5px;font-size:14px;font-weight:600;
-  color:var(--pink-deep);background:var(--pink-soft);padding:4px 12px;border-radius:20px;
+  color:var(--pink-deep);background:var(--pink-soft);padding:4px 13px;border-radius:20px;
   transition:background .18s,color .18s}
 .vlink:hover{background:var(--pink);color:#fff}
 
-.dday{display:inline-block;margin-left:6px;background:var(--pink);color:#fff;
+.dday{display:inline-block;margin-left:7px;background:var(--pink);color:#fff;
   font-family:var(--latin);font-weight:700;font-size:11.5px;padding:2px 9px;border-radius:20px;
   vertical-align:middle;letter-spacing:.3px}
-.bubble{margin-top:18px;background:var(--accent-soft);border-radius:18px 18px 18px 5px;
-  padding:11px 18px;font-family:var(--hand);font-size:16px;font-weight:600;line-height:1.5;
-  color:var(--ink);align-self:flex-start}
+.bubble{margin-top:16px;background:var(--accent-soft);border-radius:18px 18px 18px 5px;
+  padding:12px 18px;font-family:var(--hand);font-size:16px;font-weight:600;line-height:1.5;
+  color:var(--ink);display:inline-block}
 
-/* 링크 버튼이 카드 안에 들어오면 그림자를 빼고 테두리로 정리합니다 */
-.profile .links{justify-content:flex-start;margin-top:20px;gap:8px}
-.profile .links a{font-size:14px;padding:9px 17px;background:var(--page);
-  border:1px solid var(--line);box-shadow:none}
-.profile .links a:hover{background:var(--pink);border-color:var(--pink);color:#fff}
+/* 링크는 왼쪽 열에서 세로로 쌓입니다 */
+.pside .links{display:flex;flex-direction:column;align-items:stretch;gap:7px;margin:0}
+.pside .links a{justify-content:flex-start;font-size:14.5px;padding:10px 16px;
+  background:var(--page);border:1px solid var(--line);box-shadow:none;color:var(--ink)}
+.pside .links a:hover{background:var(--pink);border-color:var(--pink);color:#fff;transform:none}
 
 /* ───── 링크 버튼 ───── */
 .links{display:flex;gap:11px;justify-content:center;margin-top:26px;flex-wrap:wrap}
@@ -158,7 +176,7 @@ a{color:inherit;text-decoration:none}
 .vthumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
 .vbody{padding:13px 15px 15px;display:flex;flex-direction:column;gap:8px;flex:1}
 .vtitle{font-size:16.5px;line-height:1.35;color:var(--ink);word-break:keep-all;overflow-wrap:break-word;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
   min-height:2.7em}
 .vdate{font-family:var(--latin);font-size:13px;color:var(--sub);letter-spacing:.3px}
 .vtags{display:flex;flex-wrap:wrap;gap:6px;height:23px;overflow:hidden}
@@ -271,12 +289,15 @@ footer .credit:hover{opacity:1}
 
 /* ───── 반응형 ───── */
 @media(max-width:860px){
-  .profile{grid-template-columns:1fr;min-height:0}
-  .portrait{aspect-ratio:4/5;max-height:400px}
+  .profile{grid-template-columns:1fr;gap:30px;padding:28px 24px 32px}
+  .pshot{max-width:300px;margin:0 auto 4px}
+  .portrait{aspect-ratio:4/5}
+  .profile.wide .pshot{max-width:none}
   .profile.wide .portrait{aspect-ratio:16/9}
-  .pinfo{padding:26px 22px 30px}
-  .pinfo h2{font-size:32px}
-  .rows{grid-template-columns:1fr}
+  .pinfo h2{font-size:33px}
+  .rows .r{grid-template-columns:1fr;gap:5px;padding:12px 0}
+  .pside .links{flex-direction:row;flex-wrap:wrap}
+  .pside .links a{flex:1 1 auto;justify-content:center}
 }
 @media(max-width:680px){
   .menu{gap:18px;font-size:14px}
