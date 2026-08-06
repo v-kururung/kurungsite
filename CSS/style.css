@@ -21,7 +21,9 @@ a{color:inherit;text-decoration:none}
 .top{position:sticky;top:0;z-index:20;background:var(--page-blur);
   backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
 .top .wrap{display:flex;align-items:center;justify-content:space-between;height:70px}
-.logo{font-family:var(--disp);font-weight:400;font-size:31px;color:var(--ink);letter-spacing:.01em}
+/* 손글씨체는 굵기가 하나뿐이라 획을 살짝 두껍게 그려 존재감을 냅니다 */
+.logo{font-family:var(--disp);font-weight:400;font-size:31px;color:var(--ink);letter-spacing:.01em;
+  -webkit-text-stroke:.7px var(--ink);paint-order:stroke fill}
 .menu{display:flex;gap:34px}
 .menu a{font-size:15px;color:var(--sub);position:relative;padding:4px 0;transition:color .2s}
 .menu a:hover{color:var(--pink-deep)}
@@ -48,7 +50,7 @@ a{color:inherit;text-decoration:none}
 .week{display:grid;grid-template-columns:repeat(7,1fr);gap:12px}
 .day{background:var(--card);border-radius:16px;padding:11px 8px 12px;text-align:center;
   box-shadow:var(--shadow);min-height:142px;display:flex;flex-direction:column;
-  align-items:center;transition:transform .2s}
+  align-items:center;transition:transform .2s;border:1.5px solid transparent}
 .day:hover{transform:translateY(-4px)}
 .day .dow{font-size:14px;color:var(--sub)}
 .day.sun .dow{color:var(--pink-deep)}
@@ -62,24 +64,29 @@ a{color:inherit;text-decoration:none}
 .day .etitle{font-size:14px;line-height:1.3;color:var(--ink);text-align:center;
   word-break:keep-all;overflow-wrap:break-word;
   display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.day .evt .emore{position:absolute;top:4px;right:4px;background:var(--pink);color:#fff;
+.day .evt .emore{position:absolute;top:4px;right:4px;background:var(--pink-text);color:#fff;
   font-family:var(--latin);font-weight:600;font-size:14px;line-height:1;
   padding:2px 6px;border-radius:10px;box-shadow:0 2px 5px var(--pink-glow)}
 .day .evt.more{cursor:pointer}
 .day .evt.more:hover{background:var(--pink-soft)}
-.day.today .evt .emore,.day.special .evt .emore{background:rgba(255,255,255,.9);color:var(--pink-deep)}
-.day.today .evt.more:hover{background:rgba(255,255,255,.34)}
+.day.today .evt .emore,.day.special .evt .emore{background:var(--pink-text);color:#fff}
+.day.today .evt.more:hover,.day.special .evt.more:hover{background:var(--page)}
 .day .evt.empty{background:transparent}
 .day .evt.empty .etitle{color:var(--sub)}
-.day.today{background:var(--today-bg);box-shadow:var(--today-shadow);transform:translateY(-3px)}
-.day.today .dow,.day.today .date{color:#fff}
-.day.today .evt{background:rgba(255,255,255,.22)}
-.day.today .etitle,.day.today .etime{color:#fff}
-.day.special{background:var(--special-bg)}
-.day.special .dow,.day.special .date,
-.day.special .etitle,.day.special .etime{color:var(--special-ink)}
-.day.special .evt{background:rgba(255,255,255,.42)}
-.day.special .etitle{font-weight:700}
+/* 오늘 — 진한 배경에 흰 글씨 대신, 연한 배경에 진한 글씨로 읽히게 */
+.day.today{background:var(--today-bg);border-color:var(--pink);
+  box-shadow:var(--today-shadow);transform:translateY(-3px)}
+.day.today .dow{color:var(--pink-text)}
+.day.today .date{color:var(--pink-text)}
+.day.today .evt{background:var(--card)}
+.day.today .etitle{color:var(--ink);font-weight:600}
+.day.today .etime{color:var(--pink-text)}
+
+/* 특별한 날 */
+.day.special{background:var(--special-bg);border-color:var(--accent)}
+.day.special .dow,.day.special .date,.day.special .etime{color:var(--special-ink)}
+.day.special .evt{background:var(--card)}
+.day.special .etitle{color:var(--ink);font-weight:700}
 
 /* ───── 프로필 ───── */
 .profile{display:grid;grid-template-columns:264px 1fr;gap:44px;align-items:start;
@@ -89,7 +96,7 @@ a{color:inherit;text-decoration:none}
 /* 섹션 이름표 — 덩어리를 눈에 보이게 나눕니다 */
 .eyebrow{display:flex;align-items:center;gap:7px;margin-bottom:14px;
   font-family:var(--latin);font-weight:800;font-size:14px;letter-spacing:.2em;
-  text-transform:uppercase;color:var(--pink-deep)}
+  text-transform:uppercase;color:var(--pink-text)}
 .eyebrow::before{content:"\2726";font-size:14px;line-height:1}
 .pblock{margin-top:30px}
 
@@ -123,22 +130,18 @@ a{color:inherit;text-decoration:none}
   word-break:keep-all}
 .rows .v{font-size:16.5px;font-weight:600;color:var(--ink);line-height:1.5;
   word-break:keep-all;overflow-wrap:anywhere}
-.rows .v b{color:var(--pink-deep);font-weight:800}
+.rows .v b{color:var(--pink-text);font-weight:700}
 
-/* 나열형 값은 태그로 */
+/* 태그 — 나열값·바로가기·D-day 를 같은 모양으로 맞춥니다 */
 .chips{display:inline-flex;flex-wrap:wrap;gap:6px;vertical-align:middle}
-.chips span{font-size:14px;font-weight:600;color:var(--pink-deep);
-  background:var(--pink-soft);padding:4px 12px;border-radius:20px;line-height:1.45}
+.chips span,.vlink,.dday{display:inline-flex;align-items:center;gap:5px;
+  font-family:var(--body);font-size:14px;font-weight:700;letter-spacing:0;line-height:1.4;
+  color:var(--pink-text);background:var(--pink-soft);border:1px solid var(--pink);
+  padding:3px 12px;border-radius:20px;vertical-align:middle}
+.vlink{transition:background .18s,color .18s}
+.vlink:hover{background:var(--pink);color:var(--ink)}
+.dday{margin-left:8px}
 
-/* 값이 주소면 링크 칩으로 */
-.vlink{display:inline-flex;align-items:center;gap:5px;font-size:14px;font-weight:600;
-  color:var(--pink-deep);background:var(--pink-soft);padding:4px 13px;border-radius:20px;
-  transition:background .18s,color .18s}
-.vlink:hover{background:var(--pink);color:#fff}
-
-.dday{display:inline-block;margin-left:7px;background:var(--pink);color:#fff;
-  font-family:var(--latin);font-weight:700;font-size:14px;padding:2px 9px;border-radius:20px;
-  vertical-align:middle;letter-spacing:.3px}
 .bubble{margin-top:16px;background:var(--accent-soft);border-radius:18px 18px 18px 5px;
   padding:11px 18px;font-family:var(--hand);font-size:21px;font-weight:400;line-height:1.45;
   color:var(--ink);display:inline-block}

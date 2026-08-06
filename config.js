@@ -111,7 +111,7 @@ window.SITE_CONFIG = {
            비워두면 버튼이 흐리게 표시되고 눌리지 않습니다 */
   links: [
     { icon: 'images/logo/soop.png',    label: '숲',     url: 'https://www.sooplive.com/station/kururung' },
-    { icon: 'images/logo/cafe.png',    label: '네이버 카페', url: '' },   /* ← 카페 주소를 넣어주세요 */
+    { icon: 'images/logo/cafe.png',    label: '네이버 카페', url: 'https://cafe.naver.com/vkururung' },
     { icon: 'images/logo/youtube.png', label: '유튜브',  url: 'https://www.youtube.com/@%EC%BF%A0%EB%A3%BDv' },
     { icon: '✉️',          label: '문의',    url: 'inquiry' }
   ],

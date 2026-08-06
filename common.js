@@ -23,6 +23,22 @@ function T(s){
     .replace(/\{year\}/g, String(new Date().getFullYear()));
 }
 
+/* 두 색을 섞습니다. r=0 이면 앞 색, 1 이면 뒤 색 */
+function hexMix(a,b,r){
+  var pa=function(h){
+    h=String(h||'').replace('#','');
+    if(h.length===3) h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+    var n=parseInt(h,16);
+    return [(n>>16)&255,(n>>8)&255,n&255];
+  };
+  var x=pa(a), y=pa(b), o='#';
+  for(var i=0;i<3;i++){
+    var v=Math.round(x[i]+(y[i]-x[i])*r).toString(16);
+    o+=(v.length<2?'0':'')+v;
+  }
+  return o;
+}
+
 function hexA(hex,a){
   var h=String(hex||'').replace('#','');
   if(h.length===3) h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
@@ -50,10 +66,15 @@ function applyTheme(){
   r.setProperty('--pink-glow',    hexA(t.main,.25));
   r.setProperty('--shadow',       '0 18px 44px '+hexA(t.mainDeep,.18));
   r.setProperty('--arw-shadow',   '0 6px 16px '+hexA(t.mainDeep,.35));
-  r.setProperty('--today-bg',     'linear-gradient(155deg,'+t.main+','+t.mainDeep+')');
-  r.setProperty('--today-shadow', '0 14px 28px '+hexA(t.mainDeep,.45));
-  r.setProperty('--special-bg',   'linear-gradient(160deg,'+t.accentSoft+','+t.accent+')');
-  r.setProperty('--special-ink',  '#7a5a12');
+  /* 글자를 얹어도 읽히는 진한 포인트색 — 연한 파스텔은 흰 배경에서 잘 안 보입니다 */
+  r.setProperty('--pink-text',    hexMix(t.mainDeep, t.text, .42));
+  r.setProperty('--accent-text',  hexMix(t.accent,   t.text, .5));
+
+  /* 오늘·특별한 날은 진한 배경 대신 연한 배경 + 진한 글씨로 */
+  r.setProperty('--today-bg',     t.mainSoft);
+  r.setProperty('--today-shadow', '0 12px 26px '+hexA(t.mainDeep,.28));
+  r.setProperty('--special-bg',   t.accentSoft);
+  r.setProperty('--special-ink',  hexMix(t.accent, t.text, .55));
   r.setProperty('--portrait-bg',  'radial-gradient(120% 110% at 50% 20%,'+t.accentSoft+','+t.mainSoft+')');
   r.setProperty('--sat',          '#d99a3c');
 
