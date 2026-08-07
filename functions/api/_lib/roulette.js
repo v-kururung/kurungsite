@@ -117,6 +117,7 @@ export async function handleRoulette({ request, env, parts, admin }) {
     if (sub === 'sync' && m === 'POST') return admin ? await sync(request, env) : denied();
     if (sub === 'list' && m === 'GET') return await list(request, env, admin);
     if (sub === 'stats' && m === 'GET') return await stats(env);
+    if (sub === 'donors' && m === 'GET') return await donors(request, env);
     if (sub === 'sets' && !sub2 && m === 'GET') return json(await currentSets(env));
 
     if (sub === 'sets' && sub2 === 'sync' && m === 'POST') {
@@ -339,6 +340,72 @@ async function list(request, env, admin) {
       items: grouped.get(o.idx) || [],
     })),
     hasMore: rows.length === limit,
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * GET /api/roulette/donors — 주문내역 페이지용
+ *
+ * 후원자별로 묶어서 대기 중인 숙제와 완료 건수를 내려줍니다.
+ * 정렬은 오래 기다린 사람이 먼저, 같으면 대기가 많은 사람이 먼저.
+ * ------------------------------------------------------------------ */
+
+async function donors(request, env) {
+  const u = new URL(request.url);
+  const q = (u.searchParams.get('q') || '').trim();
+
+  const where = q ? `AND (o.donor_name LIKE ?1 OR o.donor_id LIKE ?1)` : '';
+  const args = q ? [`%${q}%`] : [];
+
+  const rows = await env.DB.prepare(
+    `SELECT o.donor_id,
+            (SELECT o2.donor_name FROM roulette_orders o2
+              WHERE o2.donor_id = o.donor_id
+              ORDER BY o2.donated_at DESC LIMIT 1) AS donor_name,
+            SUM(CASE WHEN i.status = 'pending' THEN 1 ELSE 0 END) AS pending,
+            SUM(CASE WHEN i.status = 'done'    THEN 1 ELSE 0 END) AS done,
+            MIN(CASE WHEN i.status = 'pending' THEN o.donated_at END) AS oldest_pending,
+            MAX(o.donated_at) AS last_donated
+       FROM roulette_orders o
+       JOIN roulette_items i ON i.order_idx = o.idx
+      WHERE i.kind NOT IN ('instant','meta') ${where}
+      GROUP BY o.donor_id
+     HAVING pending > 0 OR done > 0
+      ORDER BY (oldest_pending IS NULL), oldest_pending ASC, pending DESC, last_donated DESC`
+  ).bind(...args).all();
+
+  const list = rows.results;
+  if (list.length === 0) return json({ donors: [] });
+
+  /* 대기 중인 항목만 따로 받아 각 후원자에 붙입니다 */
+  const ids = list.map((d) => d.donor_id);
+  const items = await env.DB.prepare(
+    `SELECT o.donor_id, o.donated_at, i.label, i.memo, i.resolved_label
+       FROM roulette_items i
+       JOIN roulette_orders o ON o.idx = i.order_idx
+      WHERE i.status = 'pending'
+        AND i.kind NOT IN ('instant','meta')
+        AND o.donor_id IN (${ids.map(() => '?').join(',')})
+      ORDER BY o.donated_at ASC, i.seq ASC`
+  ).bind(...ids).all();
+
+  const byDonor = new Map(ids.map((id) => [id, []]));
+  items.results.forEach((it) => byDonor.get(it.donor_id)?.push({
+    label: it.label,
+    donated_at: it.donated_at,
+    memo: it.memo,
+    resolved_label: it.resolved_label,
+  }));
+
+  return json({
+    donors: list.map((d) => ({
+      donor_id: d.donor_id,
+      donor_name: d.donor_name,
+      pending: d.pending,
+      done: d.done,
+      oldest_pending: d.oldest_pending,
+      items: byDonor.get(d.donor_id) || [],
+    })),
   });
 }
 

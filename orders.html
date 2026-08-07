@@ -6,6 +6,57 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="CSS/style.css">
+<style>
+/* ───── 주문내역 ───── */
+.osum{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-bottom:16px}
+.ochip{display:inline-flex;align-items:center;gap:6px;font-size:15px;font-weight:600;
+  padding:6px 14px;border-radius:20px;background:var(--card);box-shadow:var(--shadow);color:var(--sub)}
+.ochip b{font-size:17px;color:var(--pink-text)}
+.ochip.done b{color:var(--sub)}
+.osearch{margin-left:auto;flex:0 1 220px;min-width:150px}
+.osearch input{width:100%;padding:9px 15px;border:1px solid var(--line);border-radius:20px;
+  background:var(--card);font-family:var(--body);font-size:15px;color:var(--ink)}
+.osearch input:focus{outline:2px solid var(--pink);outline-offset:-1px;border-color:transparent}
+
+.olist{display:flex;flex-direction:column;gap:11px}
+.ocard{background:var(--card);border-radius:20px;padding:18px 22px;box-shadow:var(--shadow);
+  border:1.5px solid transparent}
+.ocard.clear{border-color:var(--line);box-shadow:none;background:transparent}
+
+.ohead{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.oface{width:46px;height:46px;border-radius:50%;flex:0 0 auto;overflow:hidden;
+  background:var(--pink-soft);display:grid;place-items:center;
+  font-family:var(--disp);font-size:20px;color:var(--pink-text)}
+.oface img{width:100%;height:100%;object-fit:cover;display:block}
+.oname{font-family:var(--disp);font-size:21px;color:var(--ink);line-height:1.2}
+.oid{font-size:14px;color:var(--sub);margin-left:6px}
+.ocount{margin-left:auto;display:flex;gap:7px;flex-wrap:wrap}
+.obadge{font-size:14px;font-weight:700;padding:3px 12px;border-radius:20px;
+  color:var(--pink-text);background:var(--pink-soft);border:1px solid var(--pink);white-space:nowrap}
+.obadge.done{color:var(--sub);background:var(--page);border-color:var(--line);font-weight:600}
+
+.owait{margin-top:14px;padding-top:13px;border-top:1px solid var(--line);
+  display:flex;flex-direction:column;gap:7px}
+.oitem{display:grid;grid-template-columns:78px 1fr;gap:14px;align-items:baseline;
+  font-size:16px}
+.oitem .d{font-family:var(--disp);font-size:15px;color:var(--sub)}
+.oitem .n{font-family:var(--disp);font-size:18px;color:var(--ink);word-break:keep-all}
+.oitem .memo{font-family:var(--body);font-size:14px;color:var(--sub);margin-left:7px}
+.oitem .swap{color:var(--pink-text)}
+
+.oempty{text-align:center;padding:52px 0;color:var(--sub)}
+.oempty .emo{font-size:40px;margin-bottom:10px}
+.onote{margin-top:18px;font-size:14px;color:var(--sub);line-height:1.7;text-align:center}
+
+@media(max-width:680px){
+  .ocard{padding:15px 16px;border-radius:16px}
+  .oface{width:40px;height:40px;font-size:17px}
+  .oname{font-size:19px}
+  .ocount{margin-left:0;width:100%}
+  .oitem{grid-template-columns:66px 1fr;gap:10px}
+  .osearch{margin-left:0;flex:1 1 100%}
+}
+</style>
 </head>
 <body>
 
@@ -18,11 +69,9 @@
     <h2>주문내역</h2>
   </div>
 
-  <div class="soonbox">
-    <div class="emo">🌙</div>
-    <h3>아직 준비 중이에요</h3>
-    <p>아트머그 주문이 열리면 여기서 확인할 수 있어요.<br>조금만 기다려 주세요!</p>
-  </div>
+  <div class="osum" id="oSum"></div>
+  <div class="olist" id="oList"></div>
+  <p class="onote" id="oNote" style="display:none"></p>
 </div></main>
 
 <footer></footer>
@@ -31,6 +80,115 @@
 <script src="common.js"></script>
 <script>
 initPage('orders.html');
+
+var oList = document.getElementById('oList');
+var oSum  = document.getElementById('oSum');
+
+/* SOOP 프로필 사진 주소 규칙 — 아이디 앞 두 글자로 폴더가 나뉩니다 */
+function faceUrl(id){
+  if(!id || id.length < 2) return '';
+  return 'https://profile.img.sooplive.com/LOGO/'+id.slice(0,2)+'/'+id+'/'+id+'.jpg';
+}
+
+/* 2026-08-02 15:01:50 → 8월 2일 */
+function niceDate(s){
+  var m = String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? (+m[2])+'월 '+(+m[3])+'일' : '';
+}
+
+/* 며칠 기다렸는지 */
+function waited(s){
+  var m = String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(!m) return 0;
+  var d = new Date(+m[1], +m[2]-1, +m[3]);
+  var now = new Date(); now.setHours(0,0,0,0);
+  return Math.round((now - d) / 86400000);
+}
+
+function card(d){
+  var face = faceUrl(d.donor_id);
+  var initial = esc((d.donor_name||'?').trim().charAt(0));
+
+  var badges = '';
+  if(d.pending) badges += '<span class="obadge">대기 '+d.pending+'</span>';
+  if(d.done)    badges += '<span class="obadge done">완료 '+d.done+'</span>';
+
+  var wait = '';
+  if(d.items.length){
+    wait = '<div class="owait">' + d.items.map(function(it){
+      var name = it.resolved_label
+        ? esc(it.label)+' <span class="swap">→ '+esc(it.resolved_label)+'</span>'
+        : esc(it.label);
+      var memo = it.memo ? '<span class="memo">'+esc(it.memo)+'</span>' : '';
+      return '<div class="oitem"><span class="d">'+niceDate(it.donated_at)+'</span>'
+           + '<span class="n">'+name+memo+'</span></div>';
+    }).join('') + '</div>';
+  }
+
+  return '<div class="ocard'+(d.pending?'':' clear')+'">'
+       +   '<div class="ohead">'
+       +     '<div class="oface">'
+       +       (face ? '<img src="'+esc(face)+'" alt="" loading="lazy" '
+       +               +'onerror="this.parentNode.textContent=\''+initial+'\'">' : initial)
+       +     '</div>'
+       +     '<div><span class="oname">'+esc(d.donor_name||d.donor_id)+'</span>'
+       +       '<span class="oid">'+esc(d.donor_id)+'</span></div>'
+       +     '<div class="ocount">'+badges+'</div>'
+       +   '</div>'
+       +   wait
+       + '</div>';
+}
+
+async function load(q){
+  oList.innerHTML = '<div class="oempty">불러오는 중…</div>';
+  try{
+    var res = await fetch(API+'/roulette/donors'+(q?('?q='+encodeURIComponent(q)):''));
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    var data = await res.json();
+    var list = data.donors || [];
+
+    if(list.length === 0){
+      oList.innerHTML = '<div class="oempty"><div class="emo">🌙</div>'
+        + '<h3>'+(q ? '찾는 분이 없어요' : '아직 내역이 없어요')+'</h3></div>';
+      return;
+    }
+
+    oList.innerHTML = list.map(card).join('');
+
+    /* 가장 오래 기다린 분 안내 */
+    var top = list[0];
+    var note = document.getElementById('oNote');
+    if(top && top.pending && top.oldest_pending){
+      var days = waited(top.oldest_pending);
+      note.style.display = '';
+      note.textContent = days > 0
+        ? '가장 오래 기다린 숙제는 ' + days + '일째예요. 위에서부터 순서대로 해드릴게요 🌿'
+        : '오늘 들어온 숙제부터 차근차근 해드릴게요 🌿';
+    }
+  }catch(e){
+    oList.innerHTML = '<div class="oempty">잠시 후 다시 시도해 주세요</div>';
+  }
+}
+
+async function loadSum(){
+  try{
+    var r = await fetch(API+'/roulette/stats');
+    var s = await r.json();
+    oSum.innerHTML =
+        '<span class="ochip">남은 숙제 <b>'+(s.pending||0)+'</b></span>'
+      + '<span class="ochip done">완료 <b>'+(s.done||0)+'</b></span>'
+      + '<span class="osearch"><input id="oQ" placeholder="닉네임 검색" autocomplete="off"></span>';
+
+    var el = document.getElementById('oQ'), t;
+    el.addEventListener('input', function(){
+      clearTimeout(t);
+      t = setTimeout(function(){ load(el.value.trim()); }, 300);
+    });
+  }catch(e){ }
+}
+
+loadSum();
+load('');
 </script>
 </body>
 </html>
