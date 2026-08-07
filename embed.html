@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>쿠룽v</title>
+<meta name="robots" content="noindex">
+<!--
+  SOOP 게시글 임베드 전용 페이지입니다.
+
+  메인(index.html)은 화면 폭에 따라 세로로 쌓이지만,
+  이 페이지는 좁아져도 가로 배치를 유지하고 글씨만 작아집니다.
+  덕분에 높이가 늘 일정해서 iframe height 한 값으로 PC·모바일 모두 맞습니다.
+
+  게시글에는 이렇게 넣으세요 (height 는 720px 기준):
+
+  <div style="width:100%;max-width:100%;border:none;margin-bottom:1rem;position:relative;">
+    <div class="soop-embed-wrapper" style="height:720px">
+      <iframe src="https://kurungsite.pages.dev/embed.html"
+              style="width:100%;height:720px;border:0;display:block"
+              frameborder="0"></iframe>
+    </div>
+  </div>
+-->
+<script src="config.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+a{text-decoration:none;color:inherit}
+html,body{height:100%}
+body{background:var(--page);color:var(--ink);font-family:var(--body);
+  -webkit-font-smoothing:antialiased;overflow:hidden}
+
+.wrap{height:100%;display:flex;flex-direction:column;gap:clamp(10px,1.4vw,18px);
+  padding:clamp(14px,1.8vw,22px)}
+
+/* ───── 일정 ───── */
+.shead{display:flex;align-items:baseline;gap:9px;padding:0 2px}
+.shead h2{font-family:var(--disp);font-weight:400;font-size:clamp(15px,1.7vw,21px);
+  color:var(--ink);letter-spacing:.5px}
+.shead .range{font-family:var(--disp);font-size:clamp(12px,1.2vw,15px);color:var(--sub)}
+.shead .go{margin-left:auto;font-size:clamp(11px,1.1vw,14px);font-weight:600;
+  color:var(--pink-text);background:var(--pink-soft);border:1px solid var(--pink);
+  padding:4px 12px;border-radius:20px;white-space:nowrap;transition:background .18s}
+.shead .go:hover{background:var(--pink);color:var(--ink)}
+
+/* 7칸은 어떤 폭에서도 유지합니다 */
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:clamp(5px,.7vw,9px)}
+.day{background:var(--card);border-radius:clamp(9px,1vw,14px);
+  padding:clamp(6px,.8vw,10px) clamp(3px,.5vw,7px);text-align:center;
+  box-shadow:var(--shadow);border:1.5px solid transparent;
+  display:flex;flex-direction:column;align-items:center;min-width:0}
+.day .dow{font-family:var(--disp);font-size:clamp(11px,1.1vw,15px);color:var(--sub)}
+.day .date{font-family:var(--disp);font-size:clamp(15px,1.7vw,21px);color:var(--ink);line-height:1.15}
+.day.sat .dow{color:#7fa8dd}
+.day.sun .dow{color:var(--pink-deep)}
+
+.evt{margin-top:clamp(5px,.7vw,9px);width:100%;background:var(--page);
+  border-radius:clamp(7px,.8vw,11px);padding:clamp(5px,.6vw,8px) clamp(3px,.4vw,6px);
+  display:flex;flex-direction:column;justify-content:center;gap:2px;
+  min-height:clamp(46px,5.2vw,64px)}
+.etime{font-size:clamp(10px,1.05vw,14px);font-weight:700;color:var(--pink-text);line-height:1.15}
+.etitle{font-size:clamp(10px,1.05vw,14px);color:var(--ink);line-height:1.3;
+  display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;
+  overflow:hidden;word-break:keep-all}
+.evt.empty .etitle{color:var(--sub);opacity:.7}
+.emore{align-self:center;margin-top:1px;background:var(--pink-text);color:#fff;
+  font-family:var(--disp);font-size:clamp(10px,1vw,13px);padding:1px 7px;border-radius:10px}
+
+.day.today{background:var(--pink-soft);border-color:var(--pink)}
+.day.today .dow,.day.today .date{color:var(--pink-text)}
+.day.today .evt{background:var(--card)}
+.day.special{background:var(--accent-soft);border-color:var(--accent)}
+.day.special .dow,.day.special .date{color:var(--special-ink)}
+.day.special .evt{background:var(--card)}
+
+/* ───── 프로필 ───── */
+.profile{flex:1;min-height:0;display:grid;
+  grid-template-columns:clamp(140px,17vw,220px) 1fr;gap:clamp(14px,2vw,30px);
+  background:var(--card);border-radius:clamp(14px,1.6vw,22px);
+  padding:clamp(14px,1.8vw,26px);box-shadow:var(--shadow)}
+
+.portrait{position:relative;border-radius:clamp(10px,1.2vw,18px);overflow:hidden;
+  background:var(--portrait-bg);display:grid;place-items:center}
+.portrait img{width:100%;height:100%;object-fit:cover;object-position:50% 12%;display:block}
+.portrait .ph{font-size:clamp(34px,4vw,60px)}
+
+.pinfo{min-width:0;display:flex;flex-direction:column}
+.eyebrow{display:flex;align-items:center;gap:6px;
+  font-weight:800;font-size:clamp(10px,1vw,13px);letter-spacing:.2em;
+  text-transform:uppercase;color:var(--pink-text)}
+.eyebrow::before{content:"\2726";font-size:.9em;line-height:1}
+.pinfo h2{font-family:var(--disp);font-weight:400;font-size:clamp(22px,3vw,40px);
+  line-height:1.15;margin:4px 0 6px;color:var(--ink);letter-spacing:-.01em;
+  -webkit-text-stroke:.8px var(--ink);paint-order:stroke fill}
+.pinfo h2 span{color:var(--pink-text);-webkit-text-stroke:.8px var(--pink-text)}
+.bubble{align-self:flex-start;background:var(--accent-soft);
+  border-radius:14px 14px 14px 4px;padding:clamp(5px,.7vw,9px) clamp(9px,1.1vw,15px);
+  font-family:var(--hand);font-size:clamp(13px,1.5vw,19px);line-height:1.4;color:var(--ink)}
+
+/* 항목은 두 칸씩 채워 세로 길이를 아낍니다 */
+.rows{margin-top:clamp(9px,1.2vw,16px);display:grid;grid-template-columns:1fr 1fr;
+  gap:clamp(4px,.6vw,8px) clamp(10px,1.4vw,22px);align-content:start}
+.row{display:grid;grid-template-columns:clamp(48px,5.6vw,74px) 1fr;
+  gap:clamp(6px,.8vw,12px);align-items:baseline;
+  padding:clamp(4px,.55vw,8px) 0;border-bottom:1px solid var(--line);min-width:0}
+.row.full{grid-column:1/-1}
+.row .k{font-family:var(--disp);font-size:clamp(11px,1.15vw,15px);color:var(--sub)}
+.row .v{font-family:var(--disp);font-size:clamp(12px,1.35vw,18px);color:var(--ink);
+  line-height:1.35;word-break:keep-all;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .v b{color:var(--pink-text);font-weight:400}
+
+.tag{display:inline-flex;align-items:center;font-family:var(--body);
+  font-size:clamp(10px,1.05vw,13px);font-weight:700;color:var(--pink-text);
+  background:var(--pink-soft);border:1px solid var(--pink);
+  padding:1px 9px;border-radius:20px;line-height:1.4;vertical-align:middle}
+
+.links{margin-top:auto;padding-top:clamp(8px,1vw,14px);display:flex;flex-wrap:wrap;
+  gap:clamp(5px,.7vw,9px)}
+.links a{display:flex;align-items:center;gap:6px;background:var(--page);
+  border:1px solid var(--line);border-radius:20px;
+  padding:clamp(5px,.65vw,9px) clamp(10px,1.2vw,16px);
+  font-size:clamp(11px,1.15vw,15px);color:var(--ink);transition:.18s}
+.links a:hover{background:var(--pink-soft);border-color:var(--pink);color:var(--pink-text)}
+.links img{width:clamp(13px,1.3vw,18px);height:clamp(13px,1.3vw,18px);object-fit:contain;display:block}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div>
+    <div class="shead">
+      <h2 id="calTitle"></h2>
+      <span class="range" id="weekRange"></span>
+      <a class="go" id="goSite" target="_blank" rel="noopener">사이트에서 보기 ↗</a>
+    </div>
+    <div class="week" id="week" style="margin-top:8px"></div>
+  </div>
+
+  <section class="profile">
+    <div class="portrait" id="portrait"></div>
+    <div class="pinfo">
+      <p class="eyebrow">Profile</p>
+      <h2 id="pName"></h2>
+      <div class="bubble" id="pBubble"></div>
+      <div class="rows" id="pRows"></div>
+      <nav class="links" id="links"></nav>
+    </div>
+  </section>
+
+</div>
+
+<script src="common.js"></script>
+<script>
+applyTheme();
+
+/* 임베드 밖(새 탭)으로 나가는 링크 */
+document.getElementById('goSite').href = location.origin + '/';
+
+/* ───────── 일정 ───────── */
+var CAL = CFG.calendar || {};
+var DOW = ['월','화','수','목','금','토','일'];
+document.getElementById('calTitle').textContent = T(CAL.sectionTitle || '이번주 일정');
+
+function ymd(d){return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+function ymdTZ(d){return new Intl.DateTimeFormat('en-CA',{timeZone:CAL.timezone||'Asia/Seoul'}).format(d);}
+function mondayOf(date){
+  var d=new Date(date); d.setHours(0,0,0,0);
+  d.setDate(d.getDate()-((d.getDay()+6)%7));
+  return d;
+}
+
+async function fetchWeek(start,end){
+  if(!CAL.apiKey||!CAL.calendarId) return {};
+  var tz=CAL.timezone||'Asia/Seoul';
+  var url='https://www.googleapis.com/calendar/v3/calendars/'+encodeURIComponent(CAL.calendarId)+'/events'
+    +'?key='+CAL.apiKey+'&singleEvents=true&orderBy=startTime&maxResults=100&timeZone='+tz
+    +'&timeMin='+encodeURIComponent(start+'T00:00:00+09:00')
+    +'&timeMax='+encodeURIComponent(end+'T23:59:59+09:00');
+  var out={};
+  try{
+    var r=await fetch(url);
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    var j=await r.json();
+    (j.items||[]).forEach(function(ev){
+      var st=ev.start||{}, key, tl='';
+      if(st.date){ key=st.date; }
+      else if(st.dateTime){
+        var dt=new Date(st.dateTime);
+        key=ymdTZ(dt);
+        tl=new Intl.DateTimeFormat('ko-KR',{timeZone:tz,hour:'2-digit',minute:'2-digit',hour12:false}).format(dt);
+      } else return;
+      (out[key]=out[key]||[]).push({time:tl, title:ev.summary||'(제목 없음)'});
+    });
+  }catch(e){ }
+  return out;
+}
+
+async function renderWeek(){
+  var mon=mondayOf(new Date());
+  var sun=new Date(mon); sun.setDate(sun.getDate()+6);
+  var todayStr=ymd(new Date());
+
+  document.getElementById('weekRange').textContent=
+    (mon.getMonth()+1)+'/'+mon.getDate()+' ~ '+(sun.getMonth()+1)+'/'+sun.getDate();
+
+  var data=await fetchWeek(ymd(mon),ymd(sun));
+  var html='';
+  for(var i=0;i<7;i++){
+    var d=new Date(mon); d.setDate(mon.getDate()+i);
+    var ds=ymd(d);
+    var cls='day'+(i===6?' sun':'')+(i===5?' sat':'');
+    if(ds===CAL.specialDate) cls+=' special';
+    else if(ds===todayStr) cls+=' today';
+
+    var evts=data[ds]||[], inner;
+    if(evts.length){
+      var first=evts[0], extra=evts.length-1;
+      var tip=esc(evts.map(function(e){return (e.time?e.time+' ':'')+e.title;}).join(' / '));
+      inner=(first.time?'<span class="etime">'+esc(first.time)+'</span>':'')
+           +'<span class="etitle">'+esc(first.title)+'</span>'
+           +(extra?'<span class="emore">+'+extra+'</span>':'');
+      inner='<div class="evt" title="'+tip+'">'+inner+'</div>';
+    }else{
+      inner='<div class="evt empty"><span class="etitle">'+esc(CAL.emptyText||'\u2014')+'</span></div>';
+    }
+    html+='<div class="'+cls+'"><div class="dow">'+DOW[i]+'</div>'
+        +'<div class="date">'+d.getDate()+'</div>'+inner+'</div>';
+  }
+  document.getElementById('week').innerHTML=html;
+}
+
+renderWeek();
+setInterval(renderWeek,(CAL.pollMinutes||60)*60*1000);
+
+/* ───────── 프로필 ───────── */
+(async function(){
+  var p=CFG.profile||{}, st={};
+  try{ st=(await DB.settings())||{}; }catch(e){ }
+
+  var src=st.profile_image||p.image||'';
+  var box=document.getElementById('portrait');
+  if(src){
+    var img=new Image();
+    img.alt=fullName();
+    img.onerror=function(){ box.innerHTML='<div class="ph">&#129498;</div>'; };
+    img.src=src;
+    box.innerHTML=''; box.appendChild(img);
+  }else{
+    box.innerHTML='<div class="ph">&#129498;</div>';
+  }
+
+  document.getElementById('pName').innerHTML =
+    esc(p.nameMain)+(p.nameAccent?'<span>'+esc(p.nameAccent)+'</span>':'');
+
+  var bubble=st.profile_bubble||p.bubble;
+  var b=document.getElementById('pBubble');
+  if(bubble) b.textContent=bubble; else b.style.display='none';
+
+  var rows=p.rows||[];
+  if(st.profile_rows){
+    try{ var saved=JSON.parse(st.profile_rows); if(Array.isArray(saved)) rows=saved; }catch(e){ }
+  }
+
+  document.getElementById('pRows').innerHTML=rows.map(function(r){
+    var raw=String(r.value==null?'':r.value).trim(), v;
+    if(/^https?:\/\//i.test(raw)){
+      v='<a class="tag" href="'+esc(raw)+'" target="_blank" rel="noopener">바로가기 ↗</a>';
+    }else{
+      v=r.highlight ? '<b>'+esc(raw)+'</b>' : esc(raw);
+    }
+    if(r.dday) v+=' <span class="tag" id="dday"></span>';
+    /* 값이 길면 한 줄을 다 씁니다 */
+    var full=raw.length>14 ? ' full' : '';
+    return '<div class="row'+full+'"><span class="k">'+esc(r.key)+'</span>'
+         + '<span class="v" title="'+esc(raw)+'">'+v+'</span></div>';
+  }).join('');
+
+  var el=document.getElementById('dday');
+  if(el && p.debutDate){
+    var now=new Date(); now.setHours(0,0,0,0);
+    var d=new Date(p.debutDate+'T00:00:00');
+    var diff=Math.round((d-now)/86400000);
+    el.textContent = diff>0 ? 'D-'+diff : (diff===0 ? 'D-DAY' : '데뷔 '+(-diff+1)+'일째');
+  }
+
+  /* 링크 — 임베드 안에서는 문의창을 띄우지 않고 사이트로 보냅니다 */
+  document.getElementById('links').innerHTML=(CFG.links||[]).map(function(l){
+    var ic=/\.(png|jpg|jpeg|svg|webp|gif|ico|avif)$/i.test(l.icon)
+      ? '<img src="'+esc(l.icon)+'" alt="">'
+      : '<span>'+esc(l.icon)+'</span>';
+    var href = (l.url==='inquiry' || !l.url) ? location.origin+'/' : l.url;
+    return '<a href="'+esc(href)+'" target="_blank" rel="noopener">'+ic+esc(l.label)+'</a>';
+  }).join('');
+})();
+</script>
+</body>
+</html>
