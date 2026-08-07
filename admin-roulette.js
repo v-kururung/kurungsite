@@ -23,6 +23,9 @@
   };
   var say = function (m) { if (typeof toast === 'function') toast(m); else console.log(m); };
 
+  /* 시청자 방송국 주소 — https://www.sooplive.com/station/<아이디> */
+  var station = function (id) { return 'https://www.sooplive.com/station/' + encodeURIComponent(id); };
+
   var KIND = { instant: '즉시', task: '숙제', meta: '제외', unknown: '미분류' };
   var STATUS = { pending: '대기', scheduled: '예정', done: '완료', void: '제외' };
 
@@ -339,6 +342,10 @@
       return '<div class="rl-order" data-order="' + esc(o.idx) + '">' +
         '<div class="rl-head">' +
         '<b>' + esc(o.donor_name) + '</b><span class="rl-id">' + esc(o.donor_id) + '</span>' +
+        (o.donor_id
+          ? '<a class="rl-home" href="' + esc(station(o.donor_id)) + '" target="_blank" rel="noopener"' +
+            ' title="' + esc(o.donor_name) + ' 방송국 열기">\uD83C\uDFE0</a>'
+          : '') +
         '<span class="rl-amt">' + o.amount + '개</span>' +
         '<span class="rl-time">' + when(o.donated_at) + '</span>' +
         (o.msg ? '<span class="rl-msg">' + esc(o.msg) + '</span>' : '') +
@@ -542,6 +549,10 @@
     '.rl-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:#6b7684;margin-bottom:8px}',
     '.rl-head b{color:#333d4b;font-size:14px}',
     '.rl-id{color:#b0b8c1}',
+    '.rl-home{display:inline-flex;align-items:center;justify-content:center;',
+    'width:24px;height:24px;border-radius:7px;font-size:13px;line-height:1;text-decoration:none;',
+    'background:#f2f4f6;transition:background .15s,transform .15s}',
+    '.rl-home:hover{background:#e8f3ff;transform:translateY(-1px)}',
     '.rl-amt{color:#1b64da;font-weight:600}',
     '.rl-msg{color:#8b95a1;font-style:italic}',
     '.rl-prog{margin-left:auto;font-size:12px;padding:2px 9px;border-radius:999px;background:#f2f4f6;color:#6b7684}',
