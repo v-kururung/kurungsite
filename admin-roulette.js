@@ -113,7 +113,7 @@
       '      <button data-s="done">완료</button>',
       '      <button data-s="">전체</button>',
       '    </div>',
-      '    <input id="rlQ" placeholder="닉네임 또는 아이디" autocomplete="off">',
+      '    <input id="rlQ" placeholder="닉네임 · 아이디 · 보상 이름" autocomplete="off">',
       '    <button class="btn sub" id="rlSets">확률표 갱신</button>',
       '  </div>',
       '  <div id="rlList" class="rl-list"></div>',
@@ -308,6 +308,9 @@
      테스트 트리거로 처리하게 되는데, 그러면 후원관리에 기록이 남지 않습니다.
      그런 건들을 직접 넣는 창구입니다. */
 
+  /* '2026-08-03 20:04:00' → '2026-08-03T20:04' */
+  var toLocalInput = function (s) { return String(s || '').slice(0, 16).replace(' ', 'T'); };
+
   function nowLocal() {
     var d = new Date();
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -477,12 +480,15 @@
         '<span class="rl-amt">' + o.amount + '개</span>' +
         (String(o.idx).charAt(0) === 'M'
           ? '<span class="rl-manual">수동</span>' +
+            '<button class="rl-ed" data-edit="' + esc(o.idx) + '" title="후원자·개수·시각 고치기">✎</button>' +
             '<button class="rl-del" data-del="' + esc(o.idx) + '" title="이 수동 등록 지우기">✕</button>'
           : '') +
         '<span class="rl-time">' + when(o.donated_at) + '</span>' +
         (o.msg ? '<span class="rl-msg">' + esc(o.msg) + '</span>' : '') +
         prog +
-        '</div>' + items + '</div>';
+        '</div>' +
+        (String(o.idx).charAt(0) === 'M' ? editForm(o) : '') +
+        items + '</div>';
     }).join('');
 
     /* 같은 항목을 다시 누르면 선택이 풀립니다 */
@@ -512,8 +518,58 @@
       });
     });
 
+    bindEdit(wrap);
+
     document.getElementById('rlMore').style.display = state.hasMore ? '' : 'none';
     placeDock();
+  }
+
+  /* ───── 수동 건 고치기 ───── */
+
+  function editForm(o) {
+    return '<div class="rl-edit" data-form="' + esc(o.idx) + '">' +
+      '<div class="rl-form">' +
+      '  <label>닉네임<input data-f="donor_name" value="' + esc(o.donor_name || '') + '"></label>' +
+      '  <label>아이디<input data-f="donor_id" value="' + esc(o.donor_id || '') + '"></label>' +
+      '  <label>별풍선<input data-f="amount" type="number" min="0" value="' + (o.amount || 0) + '"></label>' +
+      '  <label>받은 시각<input data-f="donated_at" type="datetime-local" value="' +
+             esc(toLocalInput(o.donated_at)) + '"></label>' +
+      '</div>' +
+      '<div class="rl-edit-act">' +
+      '  <button class="btn sub" data-cancel="1" type="button">취소</button>' +
+      '  <button class="btn" data-save="' + esc(o.idx) + '" type="button">저장</button>' +
+      '</div></div>';
+  }
+
+  function bindEdit(wrap) {
+    wrap.querySelectorAll('button[data-edit]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var form = wrap.querySelector('.rl-edit[data-form="' + b.dataset.edit + '"]');
+        if (form) form.classList.toggle('on');
+      });
+    });
+
+    wrap.querySelectorAll('.rl-edit').forEach(function (form) {
+      form.querySelector('button[data-cancel]').addEventListener('click', function () {
+        form.classList.remove('on');
+      });
+      form.querySelector('button[data-save]').addEventListener('click', async function (e) {
+        var btn = e.currentTarget;
+        var body = { idx: btn.dataset.save };
+        form.querySelectorAll('input[data-f]').forEach(function (inp) {
+          body[inp.dataset.f] = inp.value;
+        });
+        btn.disabled = true;
+        try {
+          await api('/manual/update', { method: 'POST', body: body });
+          say('고쳤어요');
+          await refresh();
+        } catch (err) {
+          say('저장 실패: ' + err.message);
+          btn.disabled = false;
+        }
+      });
+    });
   }
 
   /* ───── 처리 바 ───── */
@@ -744,6 +800,14 @@
     'padding:2px 8px;border-radius:6px}',
     '.rl-del{border:0;background:none;color:#b0b8c1;font-size:12px;cursor:pointer;padding:2px 4px}',
     '.rl-del:hover{color:#d64545}',
+    '.rl-ed{border:0;background:none;color:#b0b8c1;font-size:13px;cursor:pointer;padding:2px 4px}',
+    '.rl-ed:hover{color:#3182f6}',
+    '.rl-edit{display:none;margin:4px 0 10px;padding:12px 13px;border-radius:11px;',
+    'background:#f8f9fa;border:1px solid #e5e8eb}',
+    '.rl-edit.on{display:block}',
+    '.rl-edit .rl-form{margin-bottom:0}',
+    '.rl-edit-act{display:flex;gap:6px;justify-content:flex-end;margin-top:10px}',
+    '.rl-edit-act .btn{padding:6px 14px;font-size:13px}',
     '.rl-un-row{display:flex;align-items:center;gap:8px;padding:8px 10px;margin:0 -10px;border-radius:8px;border-bottom:1px solid #f2f4f6;transition:background .12s}',
     '.rl-un-row:last-child{border-bottom:0}',
     '.rl-un-row:hover{background:#f8f9fa}',

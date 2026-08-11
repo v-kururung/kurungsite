@@ -130,6 +130,9 @@ export async function handleRoulette({ request, env, parts, admin }) {
     if (sub === 'manual' && sub2 === 'delete' && m === 'POST') {
       return admin ? await manualDelete(request, env) : denied();
     }
+    if (sub === 'manual' && sub2 === 'update' && m === 'POST') {
+      return admin ? await manualUpdate(request, env) : denied();
+    }
 
     if (sub === 'menu' && m === 'GET') return admin ? await menuList(env) : denied();
     if (sub === 'menu' && m === 'POST') return admin ? await menuClassify(request, env) : denied();
@@ -300,8 +303,14 @@ async function list(request, env, admin) {
      대신 카드 머리에 그 후원의 전체 진행도(완료 n/전체 m)를 함께 내려줍니다. */
   const showWhere = itemWhere.replace(/\bi\./g, '');
 
-  const searchWhere = q ? ` AND (o.donor_name LIKE ? OR o.donor_id LIKE ?)` : '';
-  const searchArgs = q ? [`%${q}%`, `%${q}%`] : [];
+  /* 닉네임·아이디뿐 아니라 보상 이름과 비고로도 찾습니다 */
+  const searchWhere = q
+    ? ` AND (o.donor_name LIKE ? OR o.donor_id LIKE ? OR o.msg LIKE ?
+             OR EXISTS (SELECT 1 FROM roulette_items s
+                         WHERE s.order_idx = o.idx
+                           AND (s.label LIKE ? OR s.memo LIKE ? OR s.resolved_label LIKE ?)))`
+    : '';
+  const searchArgs = q ? Array(6).fill(`%${q}%`) : [];
 
   const ordersQ = await env.DB.prepare(
     `SELECT o.*,
@@ -523,6 +532,49 @@ async function manualAdd(request, env) {
   }).length;
 
   return json({ ok: true, idx, items: items.length, tasks, unknown });
+}
+
+/**
+ * 수동으로 넣은 건의 후원자·개수·시각을 고칩니다.
+ * 시각을 바꾸면 자동 완료된 즉시형 항목의 처리 시각도 같이 맞춥니다.
+ * 위플랩에서 받아온 건은 원본이라 고치지 않습니다.
+ */
+async function manualUpdate(request, env) {
+  const b = await request.json().catch(() => ({}));
+  const idx = String(b.idx || '');
+  if (!idx) return json({ error: 'bad_request' }, 400);
+
+  const row = await env.DB.prepare(
+    `SELECT type, donor_name, donor_id, amount, msg, donated_at
+       FROM roulette_orders WHERE idx = ?1`
+  ).bind(idx).first();
+  if (!row) return json({ error: 'not_found' }, 404);
+  if (row.type !== 'MANUAL') return json({ error: 'not_manual' }, 403);
+
+  /* 보내지 않은 항목은 기존 값을 그대로 둡니다 */
+  let at = String(b.donated_at ?? '').trim().replace('T', ' ');
+  if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(at)) at = row.donated_at;
+  else if (at.length === 16) at += ':00';
+
+  const name = b.donor_name !== undefined
+    ? (String(b.donor_name).trim() || row.donor_name) : row.donor_name;
+  const id = b.donor_id !== undefined ? String(b.donor_id).trim() : row.donor_id;
+  const amount = b.amount !== undefined ? (Number(b.amount) || 0) : row.amount;
+  const msg = b.msg !== undefined ? String(b.msg) : row.msg;
+
+  await env.DB.batch([
+    env.DB.prepare(
+      `UPDATE roulette_orders
+          SET donor_name = ?1, donor_id = ?2, amount = ?3, msg = ?4, donated_at = ?5
+        WHERE idx = ?6 AND type = 'MANUAL'`
+    ).bind(name, id || null, amount, msg, at, idx),
+    env.DB.prepare(
+      `UPDATE roulette_items SET done_at = ?1
+        WHERE order_idx = ?2 AND kind = 'instant' AND status = 'done'`
+    ).bind(at, idx),
+  ]);
+
+  return json({ ok: true, donated_at: at });
 }
 
 /** 수동으로 넣은 건만 지웁니다. 위플랩에서 받아온 건은 건드리지 않습니다. */
