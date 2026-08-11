@@ -33,6 +33,7 @@
     status: 'pending', q: '', offset: 0,
     orders: [], hasMore: false, menu: [], menuOpen: false,
     pick: null,     /* 지금 고른 항목 (order_idx::seq) */
+    manual: [],     /* 수동 등록에 담은 룰렛 결과 */
     image: '',      /* 첨부한 이미지 주소 */
   };
 
@@ -92,6 +93,11 @@
   function shell() {
     return [
       '<div class="box" id="rlUnknown" style="display:none"></div>',
+
+      '<div class="box">',
+      '  <h3 class="rl-fold" id="rlAddHead">수동 등록 <span class="rl-arrow">▾</span></h3>',
+      '  <div id="rlAdd" style="display:none"></div>',
+      '</div>',
 
       '<div class="box">',
       '  <h3 class="rl-fold" id="rlMenuHead">룰렛 항목 관리 <span class="rl-arrow">▾</span></h3>',
@@ -297,6 +303,128 @@
     } catch (e) { say('분류 실패: ' + e.message); }
   }
 
+  /* ───── 수동 등록 ─────
+     도전미션·대결미션 별풍선은 위플랩 룰렛이 자동으로 돌지 않아
+     테스트 트리거로 처리하게 되는데, 그러면 후원관리에 기록이 남지 않습니다.
+     그런 건들을 직접 넣는 창구입니다. */
+
+  function nowLocal() {
+    var d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 16);
+  }
+
+  function renderAdd() {
+    var wrap = document.getElementById('rlAdd');
+    if (!wrap) return;
+
+    var opts = state.menu
+      .filter(function (m) { return m.active !== 0; })
+      .map(function (m) { return '<option value="' + esc(m.label) + '">' + esc(m.label) + '</option>'; })
+      .join('');
+
+    wrap.innerHTML = [
+      '<p class="rl-help">미션 별풍선처럼 위플랩에 기록이 안 남은 룰렛을 직접 넣습니다. ' +
+      '나온 결과를 순서대로 담아주세요.</p>',
+
+      '<div class="rl-form">',
+      '  <label>닉네임<input id="maName" placeholder="꾸르릉꾸" autocomplete="off"></label>',
+      '  <label>아이디<input id="maId" placeholder="bice0905" autocomplete="off"></label>',
+      '  <label>별풍선<input id="maAmt" type="number" min="0" value="330"></label>',
+      '  <label>받은 시각<input id="maAt" type="datetime-local" value="' + nowLocal() + '"></label>',
+      '</div>',
+      '<div class="rl-form">',
+      '  <label class="wide">메모 (후원 메시지 등)<input id="maMsg" placeholder="선택" autocomplete="off"></label>',
+      '</div>',
+
+      '<div class="rl-pick">',
+      '  <select id="maSel">' + (opts || '<option value="">항목 없음</option>') + '</select>',
+      '  <button class="btn sub" id="maAdd" type="button">담기</button>',
+      '  <input id="maFree" placeholder="목록에 없으면 직접 입력" autocomplete="off">',
+      '  <button class="btn sub" id="maAddFree" type="button">직접 담기</button>',
+      '</div>',
+      '<div class="rl-bag" id="maBag"></div>',
+
+      '<div class="actions">',
+      '  <span class="stat" id="maStat"></span>',
+      '  <button class="btn" id="maSave" type="button">등록하기</button>',
+      '</div>',
+    ].join('');
+
+    renderBag();
+
+    var add = function (v) {
+      v = String(v || '').trim();
+      if (!v) return;
+      state.manual.push(v);
+      renderBag();
+    };
+    document.getElementById('maAdd').addEventListener('click', function () {
+      add(document.getElementById('maSel').value);
+    });
+    document.getElementById('maAddFree').addEventListener('click', function () {
+      var el = document.getElementById('maFree');
+      add(el.value); el.value = '';
+    });
+    document.getElementById('maFree').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); add(this.value); this.value = ''; }
+    });
+    document.getElementById('maSave').addEventListener('click', saveManual);
+  }
+
+  function renderBag() {
+    var bag = document.getElementById('maBag');
+    if (!bag) return;
+    if (state.manual.length === 0) {
+      bag.innerHTML = '<span class="rl-bag-empty">담은 결과가 없어요</span>';
+      return;
+    }
+    bag.innerHTML = state.manual.map(function (label, i) {
+      return '<span class="rl-bagitem">' + (i + 1) + '. ' + esc(label) +
+        '<button type="button" data-i="' + i + '" title="빼기">✕</button></span>';
+    }).join('');
+    bag.querySelectorAll('button[data-i]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        state.manual.splice(Number(b.dataset.i), 1);
+        renderBag();
+      });
+    });
+  }
+
+  async function saveManual() {
+    var stat = document.getElementById('maStat');
+    if (state.manual.length === 0) { stat.textContent = '룰렛 결과를 먼저 담아주세요'; return; }
+
+    var name = document.getElementById('maName').value.trim();
+    var id = document.getElementById('maId').value.trim();
+    if (!name && !id) { stat.textContent = '닉네임이나 아이디 중 하나는 필요해요'; return; }
+
+    stat.textContent = '등록 중…';
+    try {
+      var r = await api('/manual', {
+        method: 'POST',
+        body: {
+          donor_name: name,
+          donor_id: id,
+          amount: Number(document.getElementById('maAmt').value) || 0,
+          donated_at: document.getElementById('maAt').value,
+          msg: document.getElementById('maMsg').value.trim(),
+          labels: state.manual,
+        },
+      });
+      var msg = '결과 ' + r.items + '개 등록 · 숙제 ' + r.tasks + '개';
+      if (r.unknown && r.unknown.length) msg += ' · 미분류 ' + r.unknown.length + '개';
+      say(msg);
+      state.manual = [];
+      document.getElementById('maMsg').value = '';
+      stat.textContent = '';
+      await refresh();
+      renderBag();
+    } catch (e) {
+      stat.textContent = '등록 실패 — ' + e.message;
+    }
+  }
+
   /* ───── 숙제 목록 ───── */
 
   function renderList() {
@@ -347,6 +475,10 @@
             ' title="' + esc(o.donor_name) + ' 방송국 열기">\uD83C\uDFE0</a>'
           : '') +
         '<span class="rl-amt">' + o.amount + '개</span>' +
+        (String(o.idx).charAt(0) === 'M'
+          ? '<span class="rl-manual">수동</span>' +
+            '<button class="rl-del" data-del="' + esc(o.idx) + '" title="이 수동 등록 지우기">✕</button>'
+          : '') +
         '<span class="rl-time">' + when(o.donated_at) + '</span>' +
         (o.msg ? '<span class="rl-msg">' + esc(o.msg) + '</span>' : '') +
         prog +
@@ -366,6 +498,17 @@
           renderList();
           loadPick();          /* 고른 항목의 기존 값을 불러옵니다 */
         }
+      });
+    });
+
+    wrap.querySelectorAll('button[data-del]').forEach(function (b) {
+      b.addEventListener('click', async function () {
+        if (!confirm('수동으로 등록한 이 건을 지울까요?\n처리 기록도 함께 사라집니다.')) return;
+        try {
+          await api('/manual/delete', { method: 'POST', body: { idx: b.dataset.del } });
+          say('지웠어요');
+          await refresh();
+        } catch (e) { say('삭제 실패: ' + e.message); }
       });
     });
 
@@ -483,6 +626,14 @@
     dock = buildDock();
     ready = true;
 
+    document.getElementById('rlAddHead').addEventListener('click', function () {
+      var box = document.getElementById('rlAdd');
+      var open = box.style.display === 'none';
+      box.style.display = open ? '' : 'none';
+      this.querySelector('.rl-arrow').textContent = open ? '▴' : '▾';
+      if (open) renderAdd();
+    });
+
     document.getElementById('rlMenuHead').addEventListener('click', function () {
       state.menuOpen = !state.menuOpen;
       document.getElementById('rlMenu').style.display = state.menuOpen ? '' : 'none';
@@ -572,6 +723,27 @@
     '.rl-shot img{width:26px;height:26px;object-fit:cover;border-radius:6px;border:1px solid #e5e8eb;display:block}',
     '.rl-empty{text-align:center;color:#8b95a1;padding:36px 0;font-size:14px}',
     '.rl-help{font-size:13px;color:#6b7684;margin:-4px 0 12px}',
+    '.rl-form{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}',
+    '.rl-form label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#8b95a1;flex:1;min-width:130px}',
+    '.rl-form label.wide{flex:1 1 100%}',
+    '.rl-form input{padding:8px 11px;border:1px solid #e5e8eb;border-radius:8px;',
+    'font:inherit;font-size:13px;color:#333d4b}',
+    '.rl-pick{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:14px 0 10px;',
+    'padding-top:13px;border-top:1px solid #f2f4f6}',
+    '.rl-pick select,.rl-pick input{padding:8px 11px;border:1px solid #e5e8eb;border-radius:8px;',
+    'font:inherit;font-size:13px;color:#333d4b;min-width:140px}',
+    '.rl-pick input{flex:1}',
+    '.rl-bag{display:flex;flex-wrap:wrap;gap:6px;min-height:34px;padding:8px;border-radius:10px;',
+    'background:#f8f9fa}',
+    '.rl-bag-empty{font-size:12px;color:#b0b8c1;padding:3px 4px}',
+    '.rl-bagitem{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;',
+    'color:#1b64da;background:#e8f3ff;border-radius:8px;padding:5px 6px 5px 10px}',
+    '.rl-bagitem button{border:0;background:none;color:#8b95a1;font-size:12px;cursor:pointer;padding:0 3px}',
+    '.rl-bagitem button:hover{color:#d64545}',
+    '.rl-manual{font-size:12px;font-weight:700;color:#0f8b4c;background:#e8f7ee;',
+    'padding:2px 8px;border-radius:6px}',
+    '.rl-del{border:0;background:none;color:#b0b8c1;font-size:12px;cursor:pointer;padding:2px 4px}',
+    '.rl-del:hover{color:#d64545}',
     '.rl-un-row{display:flex;align-items:center;gap:8px;padding:8px 10px;margin:0 -10px;border-radius:8px;border-bottom:1px solid #f2f4f6;transition:background .12s}',
     '.rl-un-row:last-child{border-bottom:0}',
     '.rl-un-row:hover{background:#f8f9fa}',

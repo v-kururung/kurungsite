@@ -126,6 +126,11 @@ export async function handleRoulette({ request, env, parts, admin }) {
       return json(await syncRouletteSets(env, { force }));
     }
 
+    if (sub === 'manual' && !sub2 && m === 'POST') return admin ? await manualAdd(request, env) : denied();
+    if (sub === 'manual' && sub2 === 'delete' && m === 'POST') {
+      return admin ? await manualDelete(request, env) : denied();
+    }
+
     if (sub === 'menu' && m === 'GET') return admin ? await menuList(env) : denied();
     if (sub === 'menu' && m === 'POST') return admin ? await menuClassify(request, env) : denied();
     if (sub === 'items' && sub2 === 'status' && m === 'POST') {
@@ -422,6 +427,120 @@ async function stats(env) {
      FROM roulette_items`
   ).first();
   return json({ pending: r?.pending ?? 0, done: r?.done ?? 0, unclassified: r?.unclassified ?? 0 });
+}
+
+/* ------------------------------------------------------------------ *
+ * POST /api/roulette/manual — 수동 등록
+ *
+ * 도전미션·대결미션 별풍선처럼 위플랩 룰렛이 자동으로 돌지 않아
+ * 테스트 트리거로 처리한 건은 후원관리에 안 남습니다.
+ * 그런 건들을 직접 넣기 위한 창구입니다.
+ *
+ * body: { donor_name, donor_id, amount, donated_at, msg, labels: ['🐻역구독', ...] }
+ * ------------------------------------------------------------------ */
+
+async function manualAdd(request, env) {
+  const b = await request.json().catch(() => ({}));
+
+  const labels = (Array.isArray(b.labels) ? b.labels : [])
+    .map((x) => String(x || '').trim())
+    .filter(Boolean);
+  if (labels.length === 0) return json({ error: 'no_labels' }, 400);
+
+  const donorId = String(b.donor_id || '').trim();
+  const donorName = String(b.donor_name || '').trim() || donorId;
+  if (!donorName) return json({ error: 'no_donor' }, 400);
+
+  /* 'YYYY-MM-DD HH:MM' 형태를 기대하지만, 없으면 지금(한국 시간)으로 */
+  let at = String(b.donated_at || '').trim().replace('T', ' ');
+  if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(at)) {
+    const now = await env.DB.prepare(`SELECT datetime('now','+9 hours') AS t`).first();
+    at = now.t;
+  } else if (at.length === 16) {
+    at += ':00';
+  }
+
+  const idx = 'M' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+  /* 확률은 최근 룰렛표에서 찾아 채웁니다 (없으면 0) */
+  const pctRows = await env.DB.prepare(
+    `SELECT si.label_key, si.percent
+       FROM roulette_set_items si
+      WHERE si.set_id IN (SELECT id FROM roulette_sets
+                           WHERE revised_at = (SELECT revised_at FROM roulette_sets
+                                                ORDER BY id DESC LIMIT 1))`
+  ).all();
+  const pct = new Map(pctRows.results.map((r) => [r.label_key, r.percent]));
+
+  /* 처음 보는 항목은 메뉴에 등록해 분류 대기로 둡니다 */
+  const items = labels.map((label, i) => ({
+    seq: i, label, label_key: normKey(label), percent: pct.get(normKey(label)) ?? 0,
+  }));
+
+  const uniq = new Map();
+  items.forEach((it) => uniq.set(it.label_key, it.label));
+  await env.DB.batch(
+    [...uniq].map(([k, label]) =>
+      env.DB.prepare(
+        `INSERT INTO roulette_menu (label_key, label, kind, first_seen, last_seen)
+         VALUES (?1, ?2, 'unknown', ?3, ?3)
+         ON CONFLICT(label_key) DO UPDATE SET
+           last_seen = MAX(COALESCE(roulette_menu.last_seen, ''), excluded.last_seen)`
+      ).bind(k, label, at)
+    )
+  );
+
+  const menuRows = await env.DB.prepare(`SELECT label_key, kind FROM roulette_menu`).all();
+  const menu = new Map(menuRows.results.map((x) => [x.label_key, x.kind]));
+
+  const stmts = [
+    env.DB.prepare(
+      `INSERT INTO roulette_orders
+         (idx,no,uid,platform,type,subtype,donor_id,donor_name,amount,msg,donated_at,stream_start,spin_count,synced_at)
+       VALUES (?1,NULL,NULL,'afreeca','MANUAL','MANUAL',?2,?3,?4,?5,?6,NULL,?7,datetime('now','+9 hours'))`
+    ).bind(idx, donorId || null, donorName, Number(b.amount) || 0,
+           String(b.msg || ''), at, items.length),
+  ];
+
+  for (const it of items) {
+    const kind = menu.get(it.label_key) ?? 'unknown';
+    const instant = kind === 'instant';
+    const status = instant ? 'done' : kind === 'meta' ? 'void' : 'pending';
+    stmts.push(
+      env.DB.prepare(
+        `INSERT OR IGNORE INTO roulette_items
+           (order_idx,seq,label,label_key,percent,kind,status,done_at)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8)`
+      ).bind(idx, it.seq, it.label, it.label_key, it.percent, kind, status, instant ? at : null)
+    );
+  }
+  await env.DB.batch(stmts);
+
+  const unknown = [...uniq.keys()].filter((k) => (menu.get(k) ?? 'unknown') === 'unknown');
+  const tasks = items.filter((it) => {
+    const k = menu.get(it.label_key) ?? 'unknown';
+    return k !== 'instant' && k !== 'meta';
+  }).length;
+
+  return json({ ok: true, idx, items: items.length, tasks, unknown });
+}
+
+/** 수동으로 넣은 건만 지웁니다. 위플랩에서 받아온 건은 건드리지 않습니다. */
+async function manualDelete(request, env) {
+  const { idx } = await request.json().catch(() => ({}));
+  if (!idx) return json({ error: 'bad_request' }, 400);
+
+  const row = await env.DB.prepare(
+    `SELECT type FROM roulette_orders WHERE idx = ?1`
+  ).bind(String(idx)).first();
+  if (!row) return json({ error: 'not_found' }, 404);
+  if (row.type !== 'MANUAL') return json({ error: 'not_manual' }, 403);
+
+  await env.DB.batch([
+    env.DB.prepare(`DELETE FROM roulette_items WHERE order_idx = ?1`).bind(String(idx)),
+    env.DB.prepare(`DELETE FROM roulette_orders WHERE idx = ?1`).bind(String(idx)),
+  ]);
+  return json({ ok: true });
 }
 
 /* ------------------------------------------------------------------ *
