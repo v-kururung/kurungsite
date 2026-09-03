@@ -404,9 +404,12 @@ async function donors(request, env) {
      공개 화면에 나가면 안 되므로 아예 조회하지 않습니다. */
   const ids = list.map((d) => d.donor_id);
   const items = await env.DB.prepare(
-    `SELECT o.donor_id, o.donated_at, i.status, i.label, i.memo, i.resolved_label, i.done_at
+    `SELECT o.donor_id, o.donated_at, i.order_idx, i.seq, i.status, i.label,
+            i.memo, i.resolved_label, i.done_at,
+            COALESCE(mn.needs_input, 0) AS needs_input
        FROM roulette_items i
        JOIN roulette_orders o ON o.idx = i.order_idx
+       LEFT JOIN roulette_menu mn ON mn.label_key = i.label_key
       WHERE i.status IN ('pending','done')
         AND i.kind NOT IN ('instant','meta')
         AND o.donor_id IN (${ids.map(() => '?').join(',')})
@@ -418,10 +421,14 @@ async function donors(request, env) {
     const bucket = byDonor.get(it.donor_id);
     if (!bucket) return;
     const row = {
+      order_idx: it.order_idx,
+      seq: it.seq,
       label: it.label,
       donated_at: it.donated_at,
       memo: it.memo,
       resolved_label: it.resolved_label,
+      /* 요청을 적어야 하는 항목인지. 내용 자체는 코드가 있어야 볼 수 있습니다 */
+      needs_input: it.needs_input ? 1 : 0,
     };
     if (it.status === 'done') bucket.done.push({ ...row, done_at: it.done_at });
     else bucket.items.push(row);
@@ -683,13 +690,18 @@ async function donorByCode(code) {
 
 /** GET /api/roulette/my?code=XXXX — 내 요청 목록 */
 async function myItems(request, env) {
-  const code = await donorByCode(new URL(request.url).searchParams.get('code'));
+  const u = new URL(request.url);
+  const code = await donorByCode(u.searchParams.get('code'));
   if (!code) return json({ error: 'bad_code' }, 400);
 
   const owner = await env.DB.prepare(
     `SELECT donor_id FROM roulette_codes WHERE code = ?1`
   ).bind(code).first();
   if (!owner) return json({ error: 'bad_code' }, 404);
+
+  /* 어느 분의 칸에서 열었는지 함께 오면 주인이 맞는지 확인합니다 */
+  const asked = String(u.searchParams.get('donor') || '').trim();
+  if (asked && asked !== owner.donor_id) return json({ error: 'other_donor' }, 403);
 
   const rows = await env.DB.prepare(
     `SELECT i.order_idx, i.seq, i.label, i.status, i.request, i.request_at,
