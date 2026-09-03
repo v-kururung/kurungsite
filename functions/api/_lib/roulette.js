@@ -632,19 +632,37 @@ function makeCode() {
   return [...buf].map((n) => chars[n % chars.length]).join('');
 }
 
-/** POST /api/roulette/code — 후원자 코드 발급(이미 있으면 그대로, force면 재발급) */
+/**
+ * POST /api/roulette/code — 후원자 코드 발급
+ * code 를 보내면 그 값으로, 비워 보내면 자동으로 만듭니다.
+ * 이미 있고 force 가 아니면 기존 코드를 그대로 돌려줍니다.
+ */
 async function issueCode(request, env) {
-  const { donor_id, force } = await request.json().catch(() => ({}));
-  const id = String(donor_id || '').trim();
+  const body = await request.json().catch(() => ({}));
+  const id = String(body.donor_id || '').trim();
   if (!id) return json({ error: 'no_donor' }, 400);
+
+  const want = String(body.code || '').trim().toUpperCase();
 
   const cur = await env.DB.prepare(
     `SELECT code FROM roulette_codes WHERE donor_id = ?1`
   ).bind(id).first();
 
-  if (cur && !force) return json({ ok: true, code: cur.code, reused: true });
+  if (cur && !body.force && !want) return json({ ok: true, code: cur.code, reused: true });
 
-  const code = makeCode();
+  let code;
+  if (want) {
+    if (!CODE_RE.test(want)) return json({ error: 'bad_format' }, 400);
+    /* 다른 사람이 쓰고 있는 코드는 막습니다 */
+    const dup = await env.DB.prepare(
+      `SELECT donor_id FROM roulette_codes WHERE code = ?1 AND donor_id <> ?2`
+    ).bind(want, id).first();
+    if (dup) return json({ error: 'duplicate' }, 409);
+    code = want;
+  } else {
+    code = makeCode();
+  }
+
   await env.DB.prepare(
     `INSERT INTO roulette_codes (donor_id, code, created_at)
      VALUES (?1, ?2, datetime('now','+9 hours'))
@@ -654,10 +672,13 @@ async function issueCode(request, env) {
   return json({ ok: true, code, reused: false });
 }
 
+/* 자동 발급은 8자, 직접 정하면 4~16자까지 */
+const CODE_RE = /^[A-Z0-9]{4,16}$/;
+
 /** 코드로 후원자를 찾습니다. 못 찾으면 null */
 async function donorByCode(code) {
   const c = String(code || '').trim().toUpperCase();
-  return /^[A-Z0-9]{8}$/.test(c) ? c : null;
+  return CODE_RE.test(c) ? c : null;
 }
 
 /** GET /api/roulette/my?code=XXXX — 내 요청 목록 */

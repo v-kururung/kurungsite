@@ -79,27 +79,47 @@
 .mybtn.sub{background:var(--page);border:1px solid var(--line);color:var(--sub);font-weight:600}
 .myerr{margin-top:10px;font-size:14px;color:#d64545}
 
-.myitem{border-top:1px solid var(--line);padding-top:14px;margin-top:14px}
-.myitem .top{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:8px}
-.myitem .nm{font-family:var(--disp);font-size:19px;color:var(--ink)}
-.myitem .dt{font-size:14px;color:var(--sub)}
-.myitem .st{margin-left:auto;font-size:14px;font-weight:700;padding:2px 11px;border-radius:20px;
-  color:var(--pink-text);background:var(--pink-soft);border:1px solid var(--pink)}
-.myitem .st.ok{color:var(--sub);background:var(--page);border-color:var(--line)}
-.myitem .guide{font-size:14px;color:var(--sub);margin-bottom:7px}
-.myitem textarea{width:100%;min-height:82px;padding:11px 14px;border:1px solid var(--line);
-  border-radius:12px;background:var(--page);font-family:var(--body);font-size:16px;
-  line-height:1.6;color:var(--ink);resize:vertical}
+/* 항목마다 카드로 감싸서 어디부터 어디까지인지 한눈에 보이게 합니다 */
+.myhead{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
+  margin:18px 0 11px;padding-top:15px;border-top:1px solid var(--line)}
+.myhead .who{font-family:var(--disp);font-size:19px;color:var(--ink)}
+.myhead .cnt{font-size:14px;color:var(--sub)}
+
+.myitem{background:var(--page);border:1px solid var(--line);border-radius:16px;
+  padding:16px 18px 14px;margin-bottom:11px;transition:border-color .18s}
+.myitem:focus-within{border-color:var(--pink)}
+.myitem.saved{border-color:var(--pink);background:var(--pink-soft)}
+
+.myitem .top{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:5px}
+.myitem .no{flex:0 0 auto;width:25px;height:25px;border-radius:50%;
+  display:grid;place-items:center;background:var(--pink);color:#fff;
+  font-family:var(--latin);font-size:14px;font-weight:700}
+.myitem .nm{font-family:var(--disp);font-size:22px;color:var(--ink);line-height:1.25}
+.myitem .st{margin-left:auto;font-size:14px;font-weight:700;padding:3px 12px;border-radius:20px;
+  color:var(--pink-text);background:var(--card);border:1px solid var(--pink);white-space:nowrap}
+.myitem .dt{display:block;margin:0 0 10px 34px;font-size:14px;color:var(--sub)}
+.myitem .guide{margin:0 0 9px 34px;padding:9px 13px;border-radius:10px;
+  background:var(--accent-soft);font-size:15px;line-height:1.55;color:var(--ink)}
+
+.myitem textarea{display:block;width:100%;min-height:96px;padding:12px 15px;
+  border:1px solid var(--line);border-radius:12px;background:var(--card);
+  font-family:var(--body);font-size:16px;line-height:1.65;color:var(--ink);resize:vertical}
+.myitem textarea::placeholder{color:var(--sub);opacity:.75}
 .myitem textarea:focus{outline:2px solid var(--pink);outline-offset:-1px;border-color:transparent}
-.myitem textarea:disabled{opacity:.7;cursor:not-allowed}
-.myitem .act{display:flex;align-items:center;gap:9px;margin-top:8px}
+
+.myitem .act{display:flex;align-items:center;gap:10px;margin-top:10px}
 .myitem .msg{font-size:14px;color:var(--sub)}
+.myitem .msg.ok{color:var(--pink-text);font-weight:600}
+.myitem .len{margin-left:auto;font-size:14px;color:var(--sub);opacity:.7}
 
 .oempty{text-align:center;padding:52px 0;color:var(--sub)}
 .oempty .emo{font-size:40px;margin-bottom:10px}
 .onote{margin-top:18px;font-size:14px;color:var(--sub);line-height:1.7;text-align:center}
 
 @media(max-width:680px){
+  .myitem{padding:14px 15px 13px}
+  .myitem .nm{font-size:20px}
+  .myitem .dt,.myitem .guide{margin-left:0}
   .odlist .at{display:block;margin-left:0}
   .ocard{padding:15px 16px;border-radius:16px}
   .oface{width:40px;height:40px;font-size:17px}
@@ -126,7 +146,7 @@
     <p class="desc">프사·방편처럼 원하는 내용을 적어야 하는 항목이 있어요.<br>
       방송에서 받은 <b>코드</b>를 넣으면 나만 볼 수 있는 작성칸이 열립니다.</p>
     <div class="myform">
-      <input id="myCode" placeholder="코드 8자리" maxlength="8" autocomplete="off" spellcheck="false">
+      <input id="myCode" placeholder="받은 코드 입력" maxlength="16" autocomplete="off" spellcheck="false">
       <button class="mybtn" id="myGo" type="button">열기</button>
     </div>
     <div id="myOut"></div>
@@ -286,22 +306,23 @@ var myOut = document.getElementById('myOut');
 var myCodeEl = document.getElementById('myCode');
 
 function myItemHtml(it, i){
-  var locked = it.locked;
-  return '<div class="myitem" data-i="'+i+'">'
+  var written = !!(it.request && it.request.trim());
+  return '<div class="myitem'+(written?' saved':'')+'" data-i="'+i+'">'
     +   '<div class="top">'
+    +     '<span class="no">'+(i+1)+'</span>'
     +     '<span class="nm">'+esc(it.label)+'</span>'
-    +     '<span class="dt">'+niceDate(it.donated_at)+'</span>'
-    +     '<span class="st'+(locked?' ok':'')+'">'+(locked?'처리 완료':'작성 가능')+'</span>'
+    +     '<span class="st">'+(written?'작성함':'작성 전')+'</span>'
     +   '</div>'
-    +   (it.input_label ? '<p class="guide">'+esc(it.input_label)+'</p>' : '')
-    +   '<textarea maxlength="1000" placeholder="'
-    +     (locked ? '이미 처리된 항목이라 고칠 수 없어요' : '원하는 내용을 적어주세요')
-    +     '"'+(locked?' disabled':'')+'>'+esc(it.request||'')+'</textarea>'
-    +   (locked ? '' :
-        '<div class="act"><button class="mybtn" type="button" data-save="'+i+'">저장</button>'
-      + '<span class="msg" data-msg="'+i+'">'
-      + (it.request_at ? '마지막 저장 '+String(it.request_at).slice(0,16) : '')
-      + '</span></div>')
+    +   '<span class="dt">'+niceDate(it.donated_at)+' 후원</span>'
+    +   '<p class="guide">'+esc(it.input_label || '원하시는 내용을 자유롭게 적어주세요')+'</p>'
+    +   '<textarea maxlength="1000" placeholder="여기에 적어주세요">'+esc(it.request||'')+'</textarea>'
+    +   '<div class="act">'
+    +     '<button class="mybtn" type="button" data-save="'+i+'">저장</button>'
+    +     '<span class="msg" data-msg="'+i+'">'
+    +       (it.request_at ? '마지막 저장 '+String(it.request_at).slice(5,16) : '')
+    +     '</span>'
+    +     '<span class="len" data-len="'+i+'"></span>'
+    +   '</div>'
     + '</div>';
 }
 
@@ -309,7 +330,9 @@ var myData = null;
 
 async function myOpen(){
   var code = myCodeEl.value.trim().toUpperCase();
-  if(code.length !== 8){ myOut.innerHTML = '<p class="myerr">코드 8자리를 넣어주세요</p>'; return; }
+  if(!/^[A-Z0-9]{4,16}$/.test(code)){
+    myOut.innerHTML = '<p class="myerr">코드를 다시 확인해 주세요</p>'; return;
+  }
 
   myOut.innerHTML = '<p class="myerr" style="color:var(--sub)">확인 중…</p>';
   try{
@@ -326,10 +349,23 @@ async function myOpen(){
       return;
     }
 
-    myOut.innerHTML = myData.items.map(myItemHtml).join('');
+    myOut.innerHTML =
+        '<div class="myhead"><span class="who">'+esc(myData.donor_name||'')+'</span>'
+      + '<span class="cnt">작성할 항목 '+myData.items.length+'개</span></div>'
+      + myData.items.map(myItemHtml).join('');
 
     myOut.querySelectorAll('button[data-save]').forEach(function(b){
       b.addEventListener('click', function(){ mySave(Number(b.dataset.save), code, b); });
+    });
+
+    /* 글자 수 표시 */
+    myOut.querySelectorAll('.myitem').forEach(function(box){
+      var i  = box.dataset.i;
+      var ta = box.querySelector('textarea');
+      var ln = box.querySelector('[data-len="'+i+'"]');
+      var upd = function(){ ln.textContent = ta.value.length + ' / 1000'; };
+      ta.addEventListener('input', upd);
+      upd();
     });
   }catch(e){
     myOut.innerHTML = '<p class="myerr">잠시 후 다시 시도해 주세요</p>';
@@ -352,8 +388,12 @@ async function mySave(i, code, btn){
     });
     if(!r.ok) throw new Error('HTTP '+r.status);
     msg.textContent = '저장했어요 🌿';
+    msg.classList.add('ok');
+    box.classList.toggle('saved', !!ta.value.trim());
+    box.querySelector('.st').textContent = ta.value.trim() ? '작성함' : '작성 전';
   }catch(e){
     msg.textContent = '저장하지 못했어요';
+    msg.classList.remove('ok');
   }
   btn.disabled = false;
 }

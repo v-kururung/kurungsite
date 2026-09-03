@@ -583,18 +583,38 @@
     wrap.querySelectorAll('button[data-code]').forEach(function (b) {
       b.addEventListener('click', async function () {
         var has = b.dataset.has;
+
         if (has) {
-          /* 이미 있으면 복사, 다시 누르면 재발급을 물어봅니다 */
+          /* 이미 있으면 먼저 복사해 둡니다 */
           try { await navigator.clipboard.writeText(has); say('코드 ' + has + ' 복사했어요'); }
           catch (e) { say('코드: ' + has); }
-          if (!confirm('코드를 새로 발급할까요?\n이전 코드는 쓸 수 없게 됩니다.')) return;
+          if (!confirm('코드를 새로 정할까요?\n이전 코드는 쓸 수 없게 됩니다.')) return;
         }
+
+        var want = prompt(
+          '이 시청자에게 줄 코드를 정해주세요.\n' +
+          '영문과 숫자로 4~16자. 비워두면 자동으로 만들어 드려요.',
+          has || ''
+        );
+        if (want === null) return;                 /* 취소 */
+
+        want = want.trim().toUpperCase();
+        if (want && !/^[A-Z0-9]{4,16}$/.test(want)) {
+          say('영문과 숫자로 4~16자여야 해요');
+          return;
+        }
+
         try {
-          var r = await api('/code', { method: 'POST', body: { donor_id: b.dataset.code, force: !!has } });
+          var r = await api('/code', {
+            method: 'POST',
+            body: { donor_id: b.dataset.code, code: want, force: !!has },
+          });
           try { await navigator.clipboard.writeText(r.code); } catch (e) { }
           say('코드 ' + r.code + ' · 복사됐어요');
           await refresh();
-        } catch (e) { say('발급 실패: ' + e.message); }
+        } catch (e) {
+          say(e.message === 'duplicate' ? '이미 다른 분이 쓰는 코드예요' : '발급 실패: ' + e.message);
+        }
       });
     });
 
