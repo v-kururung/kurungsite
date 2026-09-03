@@ -134,6 +134,11 @@ export async function handleRoulette({ request, env, parts, admin }) {
       return admin ? await manualUpdate(request, env) : denied();
     }
 
+    /* 시청자가 코드로 자기 요청을 쓰는 창구 — 로그인 없이 열립니다 */
+    if (sub === 'my' && m === 'GET') return await myItems(request, env);
+    if (sub === 'my' && m === 'POST') return await myWrite(request, env);
+    if (sub === 'code' && m === 'POST') return admin ? await issueCode(request, env) : denied();
+
     if (sub === 'menu' && m === 'GET') return admin ? await menuList(env) : denied();
     if (sub === 'menu' && m === 'POST') return admin ? await menuClassify(request, env) : denied();
     if (sub === 'items' && sub2 === 'status' && m === 'POST') {
@@ -317,7 +322,8 @@ async function list(request, env, admin) {
        (SELECT COUNT(*) FROM roulette_items t
          WHERE t.order_idx = o.idx AND t.kind NOT IN ('instant','meta')) AS task_total,
        (SELECT COUNT(*) FROM roulette_items t
-         WHERE t.order_idx = o.idx AND t.kind NOT IN ('instant','meta') AND t.status = 'done') AS task_done
+         WHERE t.order_idx = o.idx AND t.kind NOT IN ('instant','meta') AND t.status = 'done') AS task_done,
+       (SELECT c.code FROM roulette_codes c WHERE c.donor_id = o.donor_id) AS code
        FROM roulette_orders o
       WHERE EXISTS (SELECT 1 FROM roulette_items i WHERE i.order_idx = o.idx${itemWhere})
       ${searchWhere}
@@ -330,7 +336,8 @@ async function list(request, env, admin) {
 
   const ids = rows.map((r) => r.idx);
   const itemsQ = await env.DB.prepare(
-    `SELECT order_idx, seq, label, percent, kind, status, done_at, done_ref, memo, resolved_label, image_url
+    `SELECT order_idx, seq, label, percent, kind, status, done_at, done_ref, memo,
+            resolved_label, image_url, request, request_at
        FROM roulette_items
       WHERE order_idx IN (${ids.map(() => '?').join(',')})${showWhere}
       ORDER BY seq`
@@ -351,6 +358,7 @@ async function list(request, env, admin) {
       spin_count: o.spin_count,
       task_total: o.task_total,
       task_done: o.task_done,
+      code: admin ? o.code : undefined,
       items: grouped.get(o.idx) || [],
     })),
     hasMore: rows.length === limit,
@@ -391,25 +399,37 @@ async function donors(request, env) {
   const list = rows.results;
   if (list.length === 0) return json({ donors: [] });
 
-  /* 대기 중인 항목만 따로 받아 각 후원자에 붙입니다 */
+  /* 대기·완료 항목을 함께 받아 각 후원자에 붙입니다.
+     done_ref(게시글 주소)·image_url(작업 스크린샷)·request(본인만 보는 요청)는
+     공개 화면에 나가면 안 되므로 아예 조회하지 않습니다. */
   const ids = list.map((d) => d.donor_id);
   const items = await env.DB.prepare(
-    `SELECT o.donor_id, o.donated_at, i.label, i.memo, i.resolved_label
+    `SELECT o.donor_id, o.donated_at, i.status, i.label, i.memo, i.resolved_label, i.done_at
        FROM roulette_items i
        JOIN roulette_orders o ON o.idx = i.order_idx
-      WHERE i.status = 'pending'
+      WHERE i.status IN ('pending','done')
         AND i.kind NOT IN ('instant','meta')
         AND o.donor_id IN (${ids.map(() => '?').join(',')})
       ORDER BY o.donated_at ASC, i.seq ASC`
   ).bind(...ids).all();
 
-  const byDonor = new Map(ids.map((id) => [id, []]));
-  items.results.forEach((it) => byDonor.get(it.donor_id)?.push({
-    label: it.label,
-    donated_at: it.donated_at,
-    memo: it.memo,
-    resolved_label: it.resolved_label,
-  }));
+  const byDonor = new Map(ids.map((id) => [id, { items: [], done: [] }]));
+  items.results.forEach((it) => {
+    const bucket = byDonor.get(it.donor_id);
+    if (!bucket) return;
+    const row = {
+      label: it.label,
+      donated_at: it.donated_at,
+      memo: it.memo,
+      resolved_label: it.resolved_label,
+    };
+    if (it.status === 'done') bucket.done.push({ ...row, done_at: it.done_at });
+    else bucket.items.push(row);
+  });
+
+  /* 완료 목록은 최근에 해드린 것부터 */
+  byDonor.forEach((b) => b.done.sort((x, y) =>
+    String(y.done_at || '').localeCompare(String(x.done_at || ''))));
 
   return json({
     donors: list.map((d) => ({
@@ -418,7 +438,8 @@ async function donors(request, env) {
       pending: d.pending,
       done: d.done,
       oldest_pending: d.oldest_pending,
-      items: byDonor.get(d.donor_id) || [],
+      items: byDonor.get(d.donor_id)?.items || [],
+      done_items: byDonor.get(d.donor_id)?.done || [],
     })),
   });
 }
@@ -596,12 +617,133 @@ async function manualDelete(request, env) {
 }
 
 /* ------------------------------------------------------------------ *
+ * 요청 받기
+ *
+ * 프사·방편처럼 시청자가 원하는 내용을 적어야 하는 항목이 있습니다.
+ * 그 내용은 남이 보면 안 되므로, 후원자마다 코드를 하나 발급해
+ * 코드를 아는 사람만 자기 요청을 쓰고 볼 수 있게 합니다.
+ * ------------------------------------------------------------------ */
+
+/** 헷갈리는 글자(0·O·1·I·l)를 뺀 8자리 코드 */
+function makeCode() {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  const buf = new Uint8Array(8);
+  crypto.getRandomValues(buf);
+  return [...buf].map((n) => chars[n % chars.length]).join('');
+}
+
+/** POST /api/roulette/code — 후원자 코드 발급(이미 있으면 그대로, force면 재발급) */
+async function issueCode(request, env) {
+  const { donor_id, force } = await request.json().catch(() => ({}));
+  const id = String(donor_id || '').trim();
+  if (!id) return json({ error: 'no_donor' }, 400);
+
+  const cur = await env.DB.prepare(
+    `SELECT code FROM roulette_codes WHERE donor_id = ?1`
+  ).bind(id).first();
+
+  if (cur && !force) return json({ ok: true, code: cur.code, reused: true });
+
+  const code = makeCode();
+  await env.DB.prepare(
+    `INSERT INTO roulette_codes (donor_id, code, created_at)
+     VALUES (?1, ?2, datetime('now','+9 hours'))
+     ON CONFLICT(donor_id) DO UPDATE SET code = excluded.code, created_at = excluded.created_at`
+  ).bind(id, code).run();
+
+  return json({ ok: true, code, reused: false });
+}
+
+/** 코드로 후원자를 찾습니다. 못 찾으면 null */
+async function donorByCode(code) {
+  const c = String(code || '').trim().toUpperCase();
+  return /^[A-Z0-9]{8}$/.test(c) ? c : null;
+}
+
+/** GET /api/roulette/my?code=XXXX — 내 요청 목록 */
+async function myItems(request, env) {
+  const code = await donorByCode(new URL(request.url).searchParams.get('code'));
+  if (!code) return json({ error: 'bad_code' }, 400);
+
+  const owner = await env.DB.prepare(
+    `SELECT donor_id FROM roulette_codes WHERE code = ?1`
+  ).bind(code).first();
+  if (!owner) return json({ error: 'bad_code' }, 404);
+
+  const rows = await env.DB.prepare(
+    `SELECT i.order_idx, i.seq, i.label, i.status, i.request, i.request_at,
+            o.donated_at, o.donor_name,
+            COALESCE(mn.input_label, '') AS input_label
+       FROM roulette_items i
+       JOIN roulette_orders o ON o.idx = i.order_idx
+       LEFT JOIN roulette_menu mn ON mn.label_key = i.label_key
+      WHERE o.donor_id = ?1
+        AND COALESCE(mn.needs_input, 0) = 1
+        AND i.status IN ('pending','scheduled','done')
+      ORDER BY o.donated_at ASC, i.seq ASC`
+  ).bind(owner.donor_id).all();
+
+  return json({
+    donor_name: rows.results[0]?.donor_name || '',
+    items: rows.results.map((r) => ({
+      order_idx: r.order_idx,
+      seq: r.seq,
+      label: r.label,
+      status: r.status,
+      request: r.request,
+      request_at: r.request_at,
+      donated_at: r.donated_at,
+      input_label: r.input_label,
+      /* 이미 처리가 끝났으면 더 고칠 수 없습니다 */
+      locked: r.status === 'done',
+    })),
+  });
+}
+
+/** POST /api/roulette/my — 요청 저장 */
+async function myWrite(request, env) {
+  const b = await request.json().catch(() => ({}));
+  const code = await donorByCode(b.code);
+  if (!code) return json({ error: 'bad_code' }, 400);
+
+  const owner = await env.DB.prepare(
+    `SELECT donor_id FROM roulette_codes WHERE code = ?1`
+  ).bind(code).first();
+  if (!owner) return json({ error: 'bad_code' }, 404);
+
+  const text = String(b.request || '').slice(0, 1000);
+
+  /* 코드 주인의 항목인지, 요청 대상인지, 아직 안 끝났는지 모두 확인합니다 */
+  const target = await env.DB.prepare(
+    `SELECT i.status
+       FROM roulette_items i
+       JOIN roulette_orders o ON o.idx = i.order_idx
+       LEFT JOIN roulette_menu mn ON mn.label_key = i.label_key
+      WHERE i.order_idx = ?1 AND i.seq = ?2
+        AND o.donor_id = ?3
+        AND COALESCE(mn.needs_input, 0) = 1`
+  ).bind(String(b.order_idx || ''), Number(b.seq), owner.donor_id).first();
+
+  if (!target) return json({ error: 'not_found' }, 404);
+  if (target.status === 'done') return json({ error: 'locked' }, 409);
+
+  await env.DB.prepare(
+    `UPDATE roulette_items
+        SET request = ?1, request_at = datetime('now','+9 hours')
+      WHERE order_idx = ?2 AND seq = ?3`
+  ).bind(text, String(b.order_idx), Number(b.seq)).run();
+
+  return json({ ok: true });
+}
+
+/* ------------------------------------------------------------------ *
  * 관리자용
  * ------------------------------------------------------------------ */
 
 async function menuList(env) {
   const r = await env.DB.prepare(
-    `SELECT label_key, label, kind, active, first_seen, last_seen
+    `SELECT label_key, label, kind, active, first_seen, last_seen,
+            COALESCE(needs_input,0) AS needs_input, input_label
        FROM roulette_menu
       ORDER BY (kind = 'unknown') DESC, last_seen DESC`
   ).all();
@@ -617,7 +759,16 @@ async function menuList(env) {
  * 비고·다시보기 링크·교체 기록이 있으면 직접 손댄 것으로 보고 그대로 둡니다.
  */
 async function menuClassify(request, env) {
-  const { label_key, kind, reapply } = await request.json().catch(() => ({}));
+  const { label_key, kind, reapply, needs_input, input_label } = await request.json().catch(() => ({}));
+
+  /* 요청 받기 설정만 바꾸는 호출 */
+  if (label_key && kind === undefined && needs_input !== undefined) {
+    await env.DB.prepare(
+      `UPDATE roulette_menu SET needs_input = ?1, input_label = ?2 WHERE label_key = ?3`
+    ).bind(needs_input ? 1 : 0, String(input_label || '') || null, label_key).run();
+    return json({ ok: true });
+  }
+
   if (!label_key || !['instant', 'task', 'meta'].includes(kind)) return json({ error: 'bad_request' }, 400);
 
   // instant = 방송 중 즉시 처리 → 바로 완료

@@ -241,16 +241,65 @@
 
   /* ───── 항목 관리 (분류 수정) ───── */
 
-  function menuRow(items) {
+  function menuRow(items, withInput) {
     return items.map(function (m) {
       var seg = ['instant', 'task', 'meta'].map(function (k) {
         return '<button class="rl-k' + (m.kind === k ? ' on' : '') + '" data-k="' + k +
           '" data-key="' + esc(m.label_key) + '">' + KIND[k] + '</button>';
       }).join('');
+
+      /* 요청 받기는 숙제형에만 의미가 있습니다 */
+      var ask = '';
+      if (withInput && m.kind === 'task') {
+        ask = '<label class="rl-ask' + (m.needs_input ? ' on' : '') + '">' +
+          '<input type="checkbox" data-ask="' + esc(m.label_key) + '"' +
+          (m.needs_input ? ' checked' : '') + '>요청 받기</label>' +
+          '<input class="rl-askmsg" data-askmsg="' + esc(m.label_key) + '"' +
+          ' placeholder="시청자에게 보일 안내 (예: 원하는 컨셉을 적어주세요)"' +
+          ' value="' + esc(m.input_label || '') + '"' +
+          (m.needs_input ? '' : ' style="display:none"') + '>';
+      }
+
       return '<div class="rl-un-row">' +
         '<span class="rl-un-name">' + esc(m.label) + '</span>' +
+        ask +
         '<span class="rl-kseg">' + seg + '</span></div>';
     });
+  }
+
+  /* 요청 받기 저장 */
+  function bindAsk(root) {
+    root.querySelectorAll('input[data-ask]').forEach(function (c) {
+      c.addEventListener('change', function () {
+        var key = c.dataset.ask;
+        var msg = root.querySelector('input[data-askmsg="' + key + '"]');
+        if (msg) msg.style.display = c.checked ? '' : 'none';
+        c.closest('.rl-ask').classList.toggle('on', c.checked);
+        saveAsk(key, c.checked, msg ? msg.value : '');
+      });
+    });
+    root.querySelectorAll('input[data-askmsg]').forEach(function (i) {
+      var t;
+      i.addEventListener('input', function () {
+        clearTimeout(t);
+        t = setTimeout(function () {
+          var key = i.dataset.askmsg;
+          var c = root.querySelector('input[data-ask="' + key + '"]');
+          saveAsk(key, c ? c.checked : false, i.value);
+        }, 500);
+      });
+    });
+  }
+
+  async function saveAsk(label_key, on, label) {
+    try {
+      await api('/menu', {
+        method: 'POST',
+        body: { label_key: label_key, needs_input: on, input_label: label },
+      });
+      var m = state.menu.filter(function (x) { return x.label_key === label_key; })[0];
+      if (m) { m.needs_input = on ? 1 : 0; m.input_label = label; }
+    } catch (e) { say('요청 설정 실패: ' + e.message); }
   }
 
   function renderMenu() {
@@ -266,8 +315,9 @@
     wrap.innerHTML =
       '<p class="rl-help">분류를 바꾸면 앞으로 들어올 결과에 적용됩니다. ' +
       '이미 쌓인 기록까지 바꿀지는 누를 때 물어봐요.</p>' +
-      menuRow(sorted).join('');
+      menuRow(sorted, true).join('');
     bindKindButtons(wrap);
+    bindAsk(wrap);
   }
 
   function bindKindButtons(root) {
@@ -453,6 +503,11 @@
         if (it.resolved_label) extra.push('→ <b>' + esc(it.resolved_label) + '</b>');
         if (it.memo) extra.push(esc(it.memo));
 
+        /* 시청자가 남긴 요청 */
+        var req = it.request
+          ? '<div class="rl-req"><b>요청</b> ' + esc(it.request) + '</div>'
+          : (needsInput(it.label) ? '<div class="rl-req wait">요청 기다리는 중</div>' : '');
+
         var right =
           (it.image_url ? '<a class="rl-shot" href="' + esc(it.image_url) + '" target="_blank">' +
             '<img src="' + esc(it.image_url) + '" alt=""></a>' : '') +
@@ -467,7 +522,7 @@
           '<span class="rl-pct">' + it.percent + '%</span>' +
           (extra.length ? '<span class="rl-extra">' + extra.join(' · ') + '</span>' : '') +
           '<span class="rl-right">' + right + '</span>' +
-          '</label>';
+          '</label>' + req;
       }).join('');
 
       return '<div class="rl-order" data-order="' + esc(o.idx) + '">' +
@@ -478,6 +533,11 @@
             ' title="' + esc(o.donor_name) + ' 방송국 열기">\uD83C\uDFE0</a>'
           : '') +
         '<span class="rl-amt">' + o.amount + '개</span>' +
+        (o.donor_id
+          ? '<button class="rl-code" data-code="' + esc(o.donor_id) + '"' +
+            (o.code ? ' data-has="' + esc(o.code) + '"' : '') +
+            ' title="요청 작성 코드">' + (o.code ? '🔑 ' + esc(o.code) : '🔑 코드') + '</button>'
+          : '') +
         (String(o.idx).charAt(0) === 'M'
           ? '<span class="rl-manual">수동</span>' +
             '<button class="rl-ed" data-edit="' + esc(o.idx) + '" title="후원자·개수·시각 고치기">✎</button>' +
@@ -520,9 +580,39 @@
 
     bindEdit(wrap);
 
+    wrap.querySelectorAll('button[data-code]').forEach(function (b) {
+      b.addEventListener('click', async function () {
+        var has = b.dataset.has;
+        if (has) {
+          /* 이미 있으면 복사, 다시 누르면 재발급을 물어봅니다 */
+          try { await navigator.clipboard.writeText(has); say('코드 ' + has + ' 복사했어요'); }
+          catch (e) { say('코드: ' + has); }
+          if (!confirm('코드를 새로 발급할까요?\n이전 코드는 쓸 수 없게 됩니다.')) return;
+        }
+        try {
+          var r = await api('/code', { method: 'POST', body: { donor_id: b.dataset.code, force: !!has } });
+          try { await navigator.clipboard.writeText(r.code); } catch (e) { }
+          say('코드 ' + r.code + ' · 복사됐어요');
+          await refresh();
+        } catch (e) { say('발급 실패: ' + e.message); }
+      });
+    });
+
     document.getElementById('rlMore').style.display = state.hasMore ? '' : 'none';
     placeDock();
   }
+
+  /* 이 항목이 요청 받기 대상인지 */
+  function needsInput(label) {
+    var k = normKeyish(label);
+    var m = state.menu.filter(function (x) { return x.label_key === k; })[0];
+    return !!(m && m.needs_input);
+  }
+  var normKeyish = function (s) {
+    return String(s || '')
+      .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\uFE0F\u200D]/gu, '')
+      .replace(/\s+/g, ' ').trim();
+  };
 
   /* ───── 수동 건 고치기 ───── */
 
@@ -801,6 +891,18 @@
     '.rl-del{border:0;background:none;color:#b0b8c1;font-size:12px;cursor:pointer;padding:2px 4px}',
     '.rl-del:hover{color:#d64545}',
     '.rl-ed{border:0;background:none;color:#b0b8c1;font-size:13px;cursor:pointer;padding:2px 4px}',
+    '.rl-code{border:1px solid #e5e8eb;background:#fff;color:#4e5968;font:inherit;font-size:11px;',
+    'font-weight:600;letter-spacing:.5px;cursor:pointer;padding:3px 9px;border-radius:7px}',
+    '.rl-code:hover{background:#e8f3ff;border-color:#3182f6;color:#1b64da}',
+    '.rl-ask{display:flex;align-items:center;gap:4px;font-size:12px;color:#8b95a1;',
+    'cursor:pointer;white-space:nowrap;flex:0 0 auto}',
+    '.rl-ask.on{color:#1b64da;font-weight:600}',
+    '.rl-askmsg{flex:1 1 200px;min-width:0;padding:5px 10px;border:1px solid #e5e8eb;',
+    'border-radius:7px;font:inherit;font-size:12px;color:#333d4b}',
+    '.rl-req{margin:-2px 0 6px 31px;padding:7px 11px;border-radius:8px;background:#f8f9fa;',
+    'font-size:13px;color:#333d4b;line-height:1.5;white-space:pre-wrap;word-break:break-word}',
+    '.rl-req b{color:#1b64da;font-size:12px;margin-right:5px}',
+    '.rl-req.wait{color:#b0b8c1;font-style:italic}',
     '.rl-ed:hover{color:#3182f6}',
     '.rl-edit{display:none;margin:4px 0 10px;padding:12px 13px;border-radius:11px;',
     'background:#f8f9fa;border:1px solid #e5e8eb}',

@@ -44,11 +44,58 @@
 .oitem .memo{font-family:var(--body);font-size:14px;color:var(--sub);margin-left:7px}
 .oitem .swap{color:var(--pink-text)}
 
+/* 완료 목록 — 접었다 펼칩니다 */
+.odone{margin-top:12px;padding-top:11px;border-top:1px dashed var(--line)}
+.otoggle{display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:0;
+  font-family:var(--body);font-size:14px;font-weight:600;color:var(--sub);cursor:pointer}
+.otoggle:hover{color:var(--pink-text)}
+.otoggle .arw{font-size:11px;transition:transform .18s}
+.otoggle.on .arw{transform:rotate(180deg)}
+.odlist{display:none;flex-direction:column;gap:6px;margin-top:11px}
+.odlist.on{display:flex}
+.odlist .oitem{opacity:.72}
+.odlist .oitem .n{font-size:17px}
+.odlist .at{font-size:14px;color:var(--sub);margin-left:7px;white-space:nowrap}
+
+/* 내 요청 작성 */
+.mybox{background:var(--card);border-radius:20px;padding:20px 22px;box-shadow:var(--shadow);
+  margin-bottom:18px;border:1.5px solid var(--pink)}
+.mybox h3{font-family:var(--disp);font-size:20px;color:var(--ink);margin-bottom:6px}
+.mybox .desc{font-size:14px;color:var(--sub);line-height:1.6;margin-bottom:13px}
+.myform{display:flex;gap:8px;flex-wrap:wrap}
+.myform input{flex:1;min-width:150px;padding:10px 15px;border:1px solid var(--line);
+  border-radius:20px;background:var(--page);font-family:var(--body);font-size:16px;
+  letter-spacing:2px;text-transform:uppercase;color:var(--ink)}
+.myform input:focus{outline:2px solid var(--pink);outline-offset:-1px;border-color:transparent}
+.mybtn{padding:10px 22px;border:0;border-radius:20px;background:var(--pink);
+  font-family:var(--body);font-size:15px;font-weight:700;color:var(--ink);cursor:pointer;
+  transition:background .18s}
+.mybtn:hover{background:var(--pink-deep);color:#fff}
+.mybtn.sub{background:var(--page);border:1px solid var(--line);color:var(--sub);font-weight:600}
+.myerr{margin-top:10px;font-size:14px;color:#d64545}
+
+.myitem{border-top:1px solid var(--line);padding-top:14px;margin-top:14px}
+.myitem .top{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:8px}
+.myitem .nm{font-family:var(--disp);font-size:19px;color:var(--ink)}
+.myitem .dt{font-size:14px;color:var(--sub)}
+.myitem .st{margin-left:auto;font-size:14px;font-weight:700;padding:2px 11px;border-radius:20px;
+  color:var(--pink-text);background:var(--pink-soft);border:1px solid var(--pink)}
+.myitem .st.ok{color:var(--sub);background:var(--page);border-color:var(--line)}
+.myitem .guide{font-size:14px;color:var(--sub);margin-bottom:7px}
+.myitem textarea{width:100%;min-height:82px;padding:11px 14px;border:1px solid var(--line);
+  border-radius:12px;background:var(--page);font-family:var(--body);font-size:16px;
+  line-height:1.6;color:var(--ink);resize:vertical}
+.myitem textarea:focus{outline:2px solid var(--pink);outline-offset:-1px;border-color:transparent}
+.myitem textarea:disabled{opacity:.7;cursor:not-allowed}
+.myitem .act{display:flex;align-items:center;gap:9px;margin-top:8px}
+.myitem .msg{font-size:14px;color:var(--sub)}
+
 .oempty{text-align:center;padding:52px 0;color:var(--sub)}
 .oempty .emo{font-size:40px;margin-bottom:10px}
 .onote{margin-top:18px;font-size:14px;color:var(--sub);line-height:1.7;text-align:center}
 
 @media(max-width:680px){
+  .odlist .at{display:block;margin-left:0}
   .ocard{padding:15px 16px;border-radius:16px}
   .oface{width:40px;height:40px;font-size:17px}
   .oname{font-size:19px}
@@ -67,6 +114,17 @@
   <div class="mhead">
     <div class="en">Orders</div>
     <h2>주문내역</h2>
+  </div>
+
+  <div class="mybox" id="myBox">
+    <h3>내 요청 작성하기</h3>
+    <p class="desc">프사·방편처럼 원하는 내용을 적어야 하는 항목이 있어요.<br>
+      방송에서 받은 <b>코드</b>를 넣으면 나만 볼 수 있는 작성칸이 열립니다.</p>
+    <div class="myform">
+      <input id="myCode" placeholder="코드 8자리" maxlength="8" autocomplete="off" spellcheck="false">
+      <button class="mybtn" id="myGo" type="button">열기</button>
+    </div>
+    <div id="myOut"></div>
   </div>
 
   <div class="osum" id="oSum"></div>
@@ -113,16 +171,33 @@ function card(d){
   if(d.pending) badges += '<span class="obadge">대기 '+d.pending+'</span>';
   if(d.done)    badges += '<span class="obadge done">완료 '+d.done+'</span>';
 
+  function line(it, withDone){
+    var name = it.resolved_label
+      ? esc(it.label)+' <span class="swap">→ '+esc(it.resolved_label)+'</span>'
+      : esc(it.label);
+    var memo = it.memo ? '<span class="memo">'+esc(it.memo)+'</span>' : '';
+    var at = (withDone && it.done_at)
+      ? '<span class="at">'+niceDate(it.done_at)+' 완료</span>' : '';
+    return '<div class="oitem"><span class="d">'+niceDate(it.donated_at)+'</span>'
+         + '<span class="n">'+name+memo+at+'</span></div>';
+  }
+
   var wait = '';
   if(d.items.length){
-    wait = '<div class="owait">' + d.items.map(function(it){
-      var name = it.resolved_label
-        ? esc(it.label)+' <span class="swap">→ '+esc(it.resolved_label)+'</span>'
-        : esc(it.label);
-      var memo = it.memo ? '<span class="memo">'+esc(it.memo)+'</span>' : '';
-      return '<div class="oitem"><span class="d">'+niceDate(it.donated_at)+'</span>'
-           + '<span class="n">'+name+memo+'</span></div>';
-    }).join('') + '</div>';
+    wait = '<div class="owait">' + d.items.map(function(it){ return line(it, false); }).join('') + '</div>';
+  }
+
+  /* 완료한 것도 볼 수 있게. 처음엔 접혀 있습니다 */
+  var done = '';
+  if(d.done_items && d.done_items.length){
+    done = '<div class="odone">'
+         +   '<button class="otoggle" type="button">'
+         +     '완료한 '+d.done_items.length+'건 보기 <span class="arw">▾</span>'
+         +   '</button>'
+         +   '<div class="odlist">'
+         +     d.done_items.map(function(it){ return line(it, true); }).join('')
+         +   '</div>'
+         + '</div>';
   }
 
   return '<div class="ocard'+(d.pending?'':' clear')+'">'
@@ -136,6 +211,7 @@ function card(d){
        +     '<div class="ocount">'+badges+'</div>'
        +   '</div>'
        +   wait
+       +   done
        + '</div>';
 }
 
@@ -154,6 +230,16 @@ async function load(q){
     }
 
     oList.innerHTML = list.map(card).join('');
+
+    oList.querySelectorAll('.otoggle').forEach(function(b){
+      var shut = b.firstChild.textContent;          /* '완료한 12건 보기 ' */
+      b.addEventListener('click', function(){
+        var box = b.parentNode.querySelector('.odlist');
+        var open = box.classList.toggle('on');
+        b.classList.toggle('on', open);
+        b.firstChild.textContent = open ? '완료한 항목 접기 ' : shut;
+      });
+    });
 
     /* 가장 오래 기다린 분 안내 */
     var top = list[0];
@@ -186,6 +272,87 @@ async function loadSum(){
     });
   }catch(e){ }
 }
+
+/* ───── 내 요청 작성 ───── */
+
+var myOut = document.getElementById('myOut');
+var myCodeEl = document.getElementById('myCode');
+
+function myItemHtml(it, i){
+  var locked = it.locked;
+  return '<div class="myitem" data-i="'+i+'">'
+    +   '<div class="top">'
+    +     '<span class="nm">'+esc(it.label)+'</span>'
+    +     '<span class="dt">'+niceDate(it.donated_at)+'</span>'
+    +     '<span class="st'+(locked?' ok':'')+'">'+(locked?'처리 완료':'작성 가능')+'</span>'
+    +   '</div>'
+    +   (it.input_label ? '<p class="guide">'+esc(it.input_label)+'</p>' : '')
+    +   '<textarea maxlength="1000" placeholder="'
+    +     (locked ? '이미 처리된 항목이라 고칠 수 없어요' : '원하는 내용을 적어주세요')
+    +     '"'+(locked?' disabled':'')+'>'+esc(it.request||'')+'</textarea>'
+    +   (locked ? '' :
+        '<div class="act"><button class="mybtn" type="button" data-save="'+i+'">저장</button>'
+      + '<span class="msg" data-msg="'+i+'">'
+      + (it.request_at ? '마지막 저장 '+String(it.request_at).slice(0,16) : '')
+      + '</span></div>')
+    + '</div>';
+}
+
+var myData = null;
+
+async function myOpen(){
+  var code = myCodeEl.value.trim().toUpperCase();
+  if(code.length !== 8){ myOut.innerHTML = '<p class="myerr">코드 8자리를 넣어주세요</p>'; return; }
+
+  myOut.innerHTML = '<p class="myerr" style="color:var(--sub)">확인 중…</p>';
+  try{
+    var r = await fetch(API+'/roulette/my?code='+encodeURIComponent(code));
+    if(r.status === 404 || r.status === 400){
+      myOut.innerHTML = '<p class="myerr">코드를 찾을 수 없어요. 다시 확인해 주세요</p>';
+      return;
+    }
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    myData = await r.json();
+
+    if(!myData.items.length){
+      myOut.innerHTML = '<p class="myerr" style="color:var(--sub)">지금은 작성할 항목이 없어요</p>';
+      return;
+    }
+
+    myOut.innerHTML = myData.items.map(myItemHtml).join('');
+
+    myOut.querySelectorAll('button[data-save]').forEach(function(b){
+      b.addEventListener('click', function(){ mySave(Number(b.dataset.save), code, b); });
+    });
+  }catch(e){
+    myOut.innerHTML = '<p class="myerr">잠시 후 다시 시도해 주세요</p>';
+  }
+}
+
+async function mySave(i, code, btn){
+  var box = myOut.querySelector('.myitem[data-i="'+i+'"]');
+  var ta  = box.querySelector('textarea');
+  var msg = box.querySelector('[data-msg="'+i+'"]');
+  var it  = myData.items[i];
+
+  btn.disabled = true;
+  msg.textContent = '저장 중…';
+  try{
+    var r = await fetch(API+'/roulette/my', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ code: code, order_idx: it.order_idx, seq: it.seq, request: ta.value })
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    msg.textContent = '저장했어요 🌿';
+  }catch(e){
+    msg.textContent = '저장하지 못했어요';
+  }
+  btn.disabled = false;
+}
+
+document.getElementById('myGo').addEventListener('click', myOpen);
+myCodeEl.addEventListener('keydown', function(e){ if(e.key==='Enter') myOpen(); });
 
 loadSum();
 load('');
