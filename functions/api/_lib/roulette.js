@@ -679,7 +679,7 @@ async function myItems(request, env) {
        LEFT JOIN roulette_menu mn ON mn.label_key = i.label_key
       WHERE o.donor_id = ?1
         AND COALESCE(mn.needs_input, 0) = 1
-        AND i.status IN ('pending','scheduled','done')
+        AND i.status IN ('pending','scheduled')
       ORDER BY o.donated_at ASC, i.seq ASC`
   ).bind(owner.donor_id).all();
 

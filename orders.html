@@ -31,9 +31,18 @@
 .oname{font-family:var(--disp);font-size:21px;color:var(--ink);line-height:1.2}
 .oid{font-size:14px;color:var(--sub);margin-left:6px}
 .ocount{margin-left:auto;display:flex;gap:7px;flex-wrap:wrap}
-.obadge{font-size:14px;font-weight:700;padding:3px 12px;border-radius:20px;
-  color:var(--pink-text);background:var(--pink-soft);border:1px solid var(--pink);white-space:nowrap}
-.obadge.done{color:var(--sub);background:var(--page);border-color:var(--line);font-weight:600}
+/* 칩을 누르면 대기 → 완료 → 전체 순으로 바뀝니다 */
+.obadge{font-family:var(--body);font-size:14px;font-weight:700;padding:3px 12px;
+  border-radius:20px;white-space:nowrap;cursor:pointer;
+  color:var(--sub);background:var(--page);border:1px solid var(--line);
+  opacity:.55;transition:opacity .15s,background .15s,color .15s}
+.obadge:hover{opacity:.85}
+.ocard[data-mode="pending"] .obadge[data-mode="pending"],
+.ocard[data-mode="all"] .obadge[data-mode="pending"]{
+  opacity:1;color:var(--pink-text);background:var(--pink-soft);border-color:var(--pink)}
+.ocard[data-mode="done"] .obadge[data-mode="done"],
+.ocard[data-mode="all"] .obadge[data-mode="done"]{
+  opacity:1;color:var(--ink);background:var(--card);border-color:var(--sub2)}
 
 .owait{margin-top:14px;padding-top:13px;border-top:1px solid var(--line);
   display:flex;flex-direction:column;gap:7px}
@@ -44,18 +53,14 @@
 .oitem .memo{font-family:var(--body);font-size:14px;color:var(--sub);margin-left:7px}
 .oitem .swap{color:var(--pink-text)}
 
-/* 완료 목록 — 접었다 펼칩니다 */
-.odone{margin-top:12px;padding-top:11px;border-top:1px dashed var(--line)}
-.otoggle{display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:0;
-  font-family:var(--body);font-size:14px;font-weight:600;color:var(--sub);cursor:pointer}
-.otoggle:hover{color:var(--pink-text)}
-.otoggle .arw{font-size:11px;transition:transform .18s}
-.otoggle.on .arw{transform:rotate(180deg)}
-.odlist{display:none;flex-direction:column;gap:6px;margin-top:11px}
-.odlist.on{display:flex}
+/* 칩 상태에 따라 목록을 보여주고 감춥니다 */
+.ocard[data-mode="pending"] [data-list="done"],
+.ocard[data-mode="done"] [data-list="pending"]{display:none}
 .odlist .oitem{opacity:.72}
 .odlist .oitem .n{font-size:17px}
 .odlist .at{font-size:14px;color:var(--sub);margin-left:7px;white-space:nowrap}
+.ocard[data-mode="all"] [data-list="done"]{
+  margin-top:11px;padding-top:11px;border-top:1px dashed var(--line)}
 
 /* 내 요청 작성 */
 .mybox{background:var(--card);border-radius:20px;padding:20px 22px;box-shadow:var(--shadow);
@@ -168,8 +173,8 @@ function card(d){
   var initial = esc((d.donor_name||'?').trim().charAt(0));
 
   var badges = '';
-  if(d.pending) badges += '<span class="obadge">대기 '+d.pending+'</span>';
-  if(d.done)    badges += '<span class="obadge done">완료 '+d.done+'</span>';
+  if(d.pending) badges += '<button class="obadge" type="button" data-mode="pending">대기 '+d.pending+'</button>';
+  if(d.done)    badges += '<button class="obadge" type="button" data-mode="done">완료 '+d.done+'</button>';
 
   function line(it, withDone){
     var name = it.resolved_label
@@ -184,23 +189,20 @@ function card(d){
 
   var wait = '';
   if(d.items.length){
-    wait = '<div class="owait">' + d.items.map(function(it){ return line(it, false); }).join('') + '</div>';
+    wait = '<div class="owait" data-list="pending">'
+         + d.items.map(function(it){ return line(it, false); }).join('') + '</div>';
   }
 
-  /* 완료한 것도 볼 수 있게. 처음엔 접혀 있습니다 */
   var done = '';
   if(d.done_items && d.done_items.length){
-    done = '<div class="odone">'
-         +   '<button class="otoggle" type="button">'
-         +     '완료한 '+d.done_items.length+'건 보기 <span class="arw">▾</span>'
-         +   '</button>'
-         +   '<div class="odlist">'
-         +     d.done_items.map(function(it){ return line(it, true); }).join('')
-         +   '</div>'
-         + '</div>';
+    done = '<div class="owait odlist" data-list="done">'
+         + d.done_items.map(function(it){ return line(it, true); }).join('') + '</div>';
   }
 
-  return '<div class="ocard'+(d.pending?'':' clear')+'">'
+  /* 대기가 없으면 완료부터 보여줍니다 */
+  var mode = d.pending ? 'pending' : 'done';
+
+  return '<div class="ocard'+(d.pending?'':' clear')+'" data-mode="'+mode+'">'
        +   '<div class="ohead">'
        +     '<div class="oface">'
        +       (face ? '<img src="'+esc(face)+'" alt="" loading="lazy" '
@@ -231,13 +233,18 @@ async function load(q){
 
     oList.innerHTML = list.map(card).join('');
 
-    oList.querySelectorAll('.otoggle').forEach(function(b){
-      var shut = b.firstChild.textContent;          /* '완료한 12건 보기 ' */
+    /* 칩을 누르면 대기 → 완료 → 전체 순으로 돌아갑니다 */
+    var CYCLE = ['pending', 'done', 'all'];
+    oList.querySelectorAll('.obadge').forEach(function(b){
       b.addEventListener('click', function(){
-        var box = b.parentNode.querySelector('.odlist');
-        var open = box.classList.toggle('on');
-        b.classList.toggle('on', open);
-        b.firstChild.textContent = open ? '완료한 항목 접기 ' : shut;
+        var card = b.closest('.ocard');
+        var only = card.querySelectorAll('.obadge').length === 1;
+
+        /* 한쪽밖에 없으면 굳이 돌릴 게 없습니다 */
+        if(only) return;
+
+        var now = card.dataset.mode;
+        card.dataset.mode = CYCLE[(CYCLE.indexOf(now) + 1) % CYCLE.length];
       });
     });
 
