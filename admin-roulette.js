@@ -534,9 +534,17 @@
           : '') +
         '<span class="rl-amt">' + o.amount + '개</span>' +
         (o.donor_id
-          ? '<button class="rl-code" data-code="' + esc(o.donor_id) + '"' +
-            (o.code ? ' data-has="' + esc(o.code) + '"' : '') +
-            ' title="요청 작성 코드">' + (o.code ? '🔑 ' + esc(o.code) : '🔑 코드') + '</button>'
+          ? '<span class="rl-codebox">' +
+            '<button class="rl-code" data-code="' + esc(o.donor_id) + '"' +
+              (o.code ? ' data-has="' + esc(o.code) + '"' : '') +
+              ' title="' + (o.code ? '눌러서 코드 보기·복사' : '코드 발급하기') + '">' +
+              '🔑 ' + (o.code ? '<i>' + '•'.repeat(Math.min(o.code.length, 10)) + '</i>' : '발급') +
+            '</button>' +
+            '<button class="rl-codeed" data-codeed="' + esc(o.donor_id) + '"' +
+              ' data-name="' + esc(o.donor_name || o.donor_id) + '"' +
+              (o.code ? ' data-cur="' + esc(o.code) + '"' : '') +
+              ' title="코드 직접 정하기">✎</button>' +
+            '</span>'
           : '') +
         (String(o.idx).charAt(0) === 'M'
           ? '<span class="rl-manual">수동</span>' +
@@ -580,41 +588,30 @@
 
     bindEdit(wrap);
 
+    /* 코드는 눌러야 보입니다. 어깨너머로 새는 걸 막으려고 가려둡니다. */
     wrap.querySelectorAll('button[data-code]').forEach(function (b) {
       b.addEventListener('click', async function () {
-        var has = b.dataset.has;
+        var code = b.dataset.has;
 
-        if (has) {
-          /* 이미 있으면 먼저 복사해 둡니다 */
-          try { await navigator.clipboard.writeText(has); say('코드 ' + has + ' 복사했어요'); }
-          catch (e) { say('코드: ' + has); }
-          if (!confirm('코드를 새로 정할까요?\n이전 코드는 쓸 수 없게 됩니다.')) return;
+        if (!code) {
+          try {
+            var r = await api('/code', { method: 'POST', body: { donor_id: b.dataset.code } });
+            code = r.code;
+            b.dataset.has = code;
+          } catch (e) { say('발급 실패: ' + e.message); return; }
         }
 
-        var want = prompt(
-          '이 시청자에게 줄 코드를 정해주세요.\n' +
-          '영문과 숫자로 4~16자. 비워두면 자동으로 만들어 드려요.',
-          has || ''
-        );
-        if (want === null) return;                 /* 취소 */
+        b.classList.add('open');
+        b.querySelector('i').textContent = code;
+        b.title = '눌러서 다시 복사';
+        try { await navigator.clipboard.writeText(code); say('코드 ' + code + ' 복사했어요'); }
+        catch (e) { say('코드: ' + code); }
+      });
+    });
 
-        want = want.trim().toUpperCase();
-        if (want && !/^[A-Z0-9]{4,16}$/.test(want)) {
-          say('영문과 숫자로 4~16자여야 해요');
-          return;
-        }
-
-        try {
-          var r = await api('/code', {
-            method: 'POST',
-            body: { donor_id: b.dataset.code, code: want, force: !!has },
-          });
-          try { await navigator.clipboard.writeText(r.code); } catch (e) { }
-          say('코드 ' + r.code + ' · 복사됐어요');
-          await refresh();
-        } catch (e) {
-          say(e.message === 'duplicate' ? '이미 다른 분이 쓰는 코드예요' : '발급 실패: ' + e.message);
-        }
+    wrap.querySelectorAll('button[data-codeed]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        openCodeModal(b.dataset.codeed, b.dataset.name, b.dataset.cur || '');
       });
     });
 
@@ -633,6 +630,85 @@
       .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\uFE0F\u200D]/gu, '')
       .replace(/\s+/g, ' ').trim();
   };
+
+  /* ───── 코드 수정 모달 ───── */
+
+  var codeModal = null;
+
+  function buildCodeModal() {
+    var m = document.createElement('div');
+    m.className = 'rl-modal';
+    m.innerHTML = [
+      '<div class="rl-modal-in">',
+      '  <h4>요청 코드</h4>',
+      '  <p class="rl-modal-who"></p>',
+      '  <input class="rl-modal-inp" maxlength="16" autocomplete="off" spellcheck="false"',
+      '         placeholder="비워두면 자동으로 만들어요">',
+      '  <p class="rl-modal-hint">영문과 숫자로 4~16자. 시청자에게 알려줄 값이라 ',
+      '     기억하기 쉬운 걸로 정해도 됩니다.</p>',
+      '  <p class="rl-modal-err"></p>',
+      '  <div class="rl-modal-act">',
+      '    <button class="btn sub" type="button" data-close="1">취소</button>',
+      '    <button class="btn" type="button" data-ok="1">저장</button>',
+      '  </div>',
+      '</div>',
+    ].join('');
+
+    m.addEventListener('click', function (e) {
+      if (e.target === m || e.target.closest('[data-close]')) closeCodeModal();
+      else if (e.target.closest('[data-ok]')) saveCodeModal();
+    });
+    m.querySelector('.rl-modal-inp').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') saveCodeModal();
+      if (e.key === 'Escape') closeCodeModal();
+    });
+
+    document.body.appendChild(m);
+    return m;
+  }
+
+  function openCodeModal(donorId, name, cur) {
+    if (!codeModal) codeModal = buildCodeModal();
+    codeModal.dataset.donor = donorId;
+    codeModal.querySelector('.rl-modal-who').textContent = name;
+    codeModal.querySelector('.rl-modal-err').textContent = '';
+    var inp = codeModal.querySelector('.rl-modal-inp');
+    inp.value = cur;
+    codeModal.classList.add('on');
+    inp.focus();
+    inp.select();
+  }
+
+  function closeCodeModal() {
+    if (codeModal) codeModal.classList.remove('on');
+  }
+
+  async function saveCodeModal() {
+    var inp = codeModal.querySelector('.rl-modal-inp');
+    var err = codeModal.querySelector('.rl-modal-err');
+    var want = inp.value.trim().toUpperCase();
+
+    if (want && !/^[A-Z0-9]{4,16}$/.test(want)) {
+      err.textContent = '영문과 숫자로 4~16자여야 해요';
+      return;
+    }
+
+    err.textContent = '';
+    try {
+      var r = await api('/code', {
+        method: 'POST',
+        body: { donor_id: codeModal.dataset.donor, code: want, force: true },
+      });
+      closeCodeModal();
+      try { await navigator.clipboard.writeText(r.code); } catch (e) { }
+      say('코드 ' + r.code + ' · 복사됐어요');
+      await refresh();
+    } catch (e) {
+      err.textContent = e.message === 'duplicate'
+        ? '이미 다른 분이 쓰고 있는 코드예요'
+        : '저장하지 못했어요 — ' + e.message;
+    }
+  }
 
   /* ───── 수동 건 고치기 ───── */
 
@@ -911,6 +987,25 @@
     '.rl-del{border:0;background:none;color:#b0b8c1;font-size:12px;cursor:pointer;padding:2px 4px}',
     '.rl-del:hover{color:#d64545}',
     '.rl-ed{border:0;background:none;color:#b0b8c1;font-size:13px;cursor:pointer;padding:2px 4px}',
+    '.rl-codebox{display:inline-flex;align-items:center;gap:1px;flex:0 0 auto}',
+    '.rl-code i{font-style:normal;letter-spacing:1.5px}',
+    '.rl-code.open i{letter-spacing:.5px;color:#1b64da}',
+    '.rl-codeed{border:0;background:none;color:#b0b8c1;font-size:12px;cursor:pointer;padding:2px 4px}',
+    '.rl-codeed:hover{color:#3182f6}',
+    '.rl-modal{position:fixed;inset:0;z-index:9000;display:none;place-items:center;',
+    'background:rgba(0,0,0,.35);padding:20px}',
+    '.rl-modal.on{display:grid}',
+    '.rl-modal-in{width:100%;max-width:340px;background:#fff;border-radius:16px;padding:22px 24px;',
+    'box-shadow:0 12px 40px rgba(0,0,0,.18)}',
+    '.rl-modal-in h4{font-size:16px;color:#333d4b;margin:0 0 3px}',
+    '.rl-modal-who{font-size:13px;color:#8b95a1;margin:0 0 14px}',
+    '.rl-modal-inp{width:100%;box-sizing:border-box;padding:11px 14px;border:1px solid #e5e8eb;',
+    'border-radius:9px;font:inherit;font-size:15px;letter-spacing:1.5px;text-transform:uppercase;',
+    'color:#333d4b}',
+    '.rl-modal-inp:focus{outline:2px solid #3182f6;outline-offset:-1px;border-color:transparent}',
+    '.rl-modal-hint{font-size:12px;color:#8b95a1;line-height:1.55;margin:8px 0 0}',
+    '.rl-modal-err{font-size:13px;color:#d64545;margin:8px 0 0;min-height:1px}',
+    '.rl-modal-act{display:flex;gap:7px;justify-content:flex-end;margin-top:16px}',
     '.rl-code{border:1px solid #e5e8eb;background:#fff;color:#4e5968;font:inherit;font-size:11px;',
     'font-weight:600;letter-spacing:.5px;cursor:pointer;padding:3px 9px;border-radius:7px}',
     '.rl-code:hover{background:#e8f3ff;border-color:#3182f6;color:#1b64da}',

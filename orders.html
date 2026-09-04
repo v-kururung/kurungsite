@@ -18,6 +18,14 @@
   background:var(--card);font-family:var(--body);font-size:15px;color:var(--ink)}
 .osearch input:focus{outline:2px solid var(--pink);outline-offset:-1px;border-color:transparent}
 
+/* 정렬 */
+.osort{display:flex;gap:6px;margin:-6px 0 16px}
+.osort button{font-family:var(--body);font-size:14px;font-weight:600;padding:5px 14px;
+  border-radius:7px;cursor:pointer;color:var(--sub);background:var(--card);
+  border:1px solid var(--line);transition:background .15s,color .15s,border-color .15s}
+.osort button:hover{border-color:var(--sub2)}
+.osort button.on{color:var(--pink-text);background:var(--pink-soft);border-color:var(--pink)}
+
 /* ───── 후원자 카드 ───── */
 .olist{display:flex;flex-direction:column;gap:11px}
 .ocard{background:var(--card);border-radius:20px;padding:18px 22px;box-shadow:var(--shadow);
@@ -133,6 +141,10 @@
   </div>
 
   <div class="osum" id="oSum"></div>
+  <div class="osort" id="oSort">
+    <button type="button" data-sort="old" class="on">과거순</button>
+    <button type="button" data-sort="new">최신순</button>
+  </div>
   <div class="olist" id="oList"></div>
   <p class="onote" id="oNote" style="display:none"></p>
 </div></main>
@@ -147,6 +159,8 @@ initPage('orders.html');
 var oList = document.getElementById('oList');
 var oSum  = document.getElementById('oSum');
 var DONORS = [];            /* 지금 화면에 뿌린 후원자들 */
+var ORDER  = 'old';         /* old = 오래 기다린 순, new = 최근 후원 순 */
+var QUERY  = '';
 
 /* SOOP 프로필 사진 주소 규칙 — 아이디 앞 두 글자로 폴더가 나뉩니다 */
 function faceUrl(id){
@@ -341,9 +355,11 @@ async function unlock(cardEl){
 /* ───────── 목록 ───────── */
 
 async function load(q){
+  QUERY = q || '';
   oList.innerHTML = '<div class="oempty">불러오는 중…</div>';
   try{
-    var res = await fetch(API+'/roulette/donors'+(q?('?q='+encodeURIComponent(q)):''));
+    var qs = '?order='+ORDER + (QUERY ? '&q='+encodeURIComponent(QUERY) : '');
+    var res = await fetch(API+'/roulette/donors'+qs);
     if(!res.ok) throw new Error('HTTP '+res.status);
     var data = await res.json();
     DONORS = data.donors || [];
@@ -381,7 +397,8 @@ async function load(q){
 
     var top = DONORS[0];
     var note = document.getElementById('oNote');
-    if(top && top.pending && top.oldest_pending){
+    note.style.display = 'none';
+    if(ORDER === 'old' && top && top.pending && top.oldest_pending){
       var days = waited(top.oldest_pending);
       note.style.display = '';
       note.textContent = days > 0
@@ -409,6 +426,14 @@ async function loadSum(){
     });
   }catch(e){ }
 }
+
+document.getElementById('oSort').addEventListener('click', function(e){
+  var b = e.target.closest('button[data-sort]');
+  if(!b || b.dataset.sort === ORDER) return;
+  ORDER = b.dataset.sort;
+  this.querySelectorAll('button').forEach(function(x){ x.classList.toggle('on', x === b); });
+  load(QUERY);
+});
 
 loadSum();
 load('');

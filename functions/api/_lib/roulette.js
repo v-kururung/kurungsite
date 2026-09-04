@@ -308,14 +308,24 @@ async function list(request, env, admin) {
      대신 카드 머리에 그 후원의 전체 진행도(완료 n/전체 m)를 함께 내려줍니다. */
   const showWhere = itemWhere.replace(/\bi\./g, '');
 
-  /* 닉네임·아이디뿐 아니라 보상 이름과 비고로도 찾습니다 */
+  /* 닉네임·아이디뿐 아니라 보상 이름과 비고로도 찾습니다.
+     보상 이름으로 찾을 때도 지금 보고 있는 상태(대기/완료)를 그대로 지켜야
+     "대기 탭인데 완료된 구독권 때문에 걸려 나오는" 일이 없습니다. */
+  const searchItemCond = [];
+  const searchItemArgs = [];
+  if (scope === 'task') searchItemCond.push(`s.kind NOT IN ('instant','meta')`);
+  if (status) { searchItemCond.push(`s.status = ?`); searchItemArgs.push(status); }
+  const searchItemWhere = searchItemCond.length ? ` AND ${searchItemCond.join(' AND ')}` : '';
+
   const searchWhere = q
     ? ` AND (o.donor_name LIKE ? OR o.donor_id LIKE ? OR o.msg LIKE ?
              OR EXISTS (SELECT 1 FROM roulette_items s
-                         WHERE s.order_idx = o.idx
+                         WHERE s.order_idx = o.idx${searchItemWhere}
                            AND (s.label LIKE ? OR s.memo LIKE ? OR s.resolved_label LIKE ?)))`
     : '';
-  const searchArgs = q ? Array(6).fill(`%${q}%`) : [];
+  const searchArgs = q
+    ? [`%${q}%`, `%${q}%`, `%${q}%`, ...searchItemArgs, `%${q}%`, `%${q}%`, `%${q}%`]
+    : [];
 
   const ordersQ = await env.DB.prepare(
     `SELECT o.*,
@@ -375,6 +385,8 @@ async function list(request, env, admin) {
 async function donors(request, env) {
   const u = new URL(request.url);
   const q = (u.searchParams.get('q') || '').trim();
+  /* new = 최근에 후원한 분부터, old = 오래 기다린 분부터(기본) */
+  const newest = u.searchParams.get('order') === 'new';
 
   const where = q ? `AND (o.donor_name LIKE ?1 OR o.donor_id LIKE ?1)` : '';
   const args = q ? [`%${q}%`] : [];
@@ -393,7 +405,9 @@ async function donors(request, env) {
       WHERE i.kind NOT IN ('instant','meta') ${where}
       GROUP BY o.donor_id
      HAVING pending > 0 OR done > 0
-      ORDER BY (oldest_pending IS NULL), oldest_pending ASC, pending DESC, last_donated DESC`
+      ORDER BY ${newest
+        ? 'last_donated DESC'
+        : '(oldest_pending IS NULL), oldest_pending ASC, pending DESC, last_donated DESC'}`
   ).bind(...args).all();
 
   const list = rows.results;
