@@ -136,6 +136,7 @@ export async function handleRoulette({ request, env, parts, admin }) {
 
     /* 시청자가 코드로 자기 요청을 쓰는 창구 — 로그인 없이 열립니다 */
     if (sub === 'my' && m === 'GET') return await myItems(request, env);
+    if (sub === 'my' && sub2 === 'upload' && m === 'POST') return await myUpload(request, env);
     if (sub === 'my' && m === 'POST') return await myWrite(request, env);
     if (sub === 'code' && m === 'POST') return admin ? await issueCode(request, env) : denied();
 
@@ -347,7 +348,8 @@ async function list(request, env, admin) {
   const ids = rows.map((r) => r.idx);
   const itemsQ = await env.DB.prepare(
     `SELECT order_idx, seq, label, percent, kind, status, done_at, done_ref, memo,
-            resolved_label, image_url, request, request_at
+            resolved_label, image_url, request, request_at,
+            request_image, request_email, reply, reply_at
        FROM roulette_items
       WHERE order_idx IN (${ids.map(() => '?').join(',')})${showWhere}
       ORDER BY seq`
@@ -719,6 +721,7 @@ async function myItems(request, env) {
 
   const rows = await env.DB.prepare(
     `SELECT i.order_idx, i.seq, i.label, i.status, i.request, i.request_at,
+            i.request_image, i.request_email, i.reply, i.reply_at,
             o.donated_at, o.donor_name,
             COALESCE(mn.input_label, '') AS input_label
        FROM roulette_items i
@@ -739,6 +742,10 @@ async function myItems(request, env) {
       status: r.status,
       request: r.request,
       request_at: r.request_at,
+      request_image: r.request_image,
+      request_email: r.request_email,
+      reply: r.reply,
+      reply_at: r.reply_at,
       donated_at: r.donated_at,
       input_label: r.input_label,
       /* 이미 처리가 끝났으면 더 고칠 수 없습니다 */
@@ -759,6 +766,10 @@ async function myWrite(request, env) {
   if (!owner) return json({ error: 'bad_code' }, 404);
 
   const text = String(b.request || '').slice(0, 1000);
+  const email = String(b.request_email || '').trim().slice(0, 200);
+  /* 첨부는 우리가 올려준 주소만 받습니다 */
+  const image = /^\/api\/img\/[\w./-]+$/.test(String(b.request_image || ''))
+    ? String(b.request_image) : '';
 
   /* 코드 주인의 항목인지, 요청 대상인지, 아직 안 끝났는지 모두 확인합니다 */
   const target = await env.DB.prepare(
@@ -776,11 +787,42 @@ async function myWrite(request, env) {
 
   await env.DB.prepare(
     `UPDATE roulette_items
-        SET request = ?1, request_at = datetime('now','+9 hours')
-      WHERE order_idx = ?2 AND seq = ?3`
-  ).bind(text, String(b.order_idx), Number(b.seq)).run();
+        SET request = ?1, request_email = ?2, request_image = ?3,
+            request_at = datetime('now','+9 hours')
+      WHERE order_idx = ?4 AND seq = ?5`
+  ).bind(text, email, image, String(b.order_idx), Number(b.seq)).run();
 
   return json({ ok: true });
+}
+
+/**
+ * POST /api/roulette/my/upload — 시청자 이미지 첨부
+ * 코드를 가진 사람만 올릴 수 있고, 이미지만 5MB까지 받습니다.
+ */
+async function myUpload(request, env) {
+  const form = await request.formData().catch(() => null);
+  if (!form) return json({ error: 'bad_request' }, 400);
+
+  const code = await donorByCode(form.get('code'));
+  if (!code) return json({ error: 'bad_code' }, 400);
+
+  const owner = await env.DB.prepare(
+    `SELECT donor_id FROM roulette_codes WHERE code = ?1`
+  ).bind(code).first();
+  if (!owner) return json({ error: 'bad_code' }, 404);
+
+  const file = form.get('file');
+  if (!file || typeof file === 'string') return json({ error: 'no_file' }, 400);
+
+  const type = String(file.type || '');
+  if (!/^image\/(png|jpe?g|gif|webp)$/.test(type)) return json({ error: 'bad_type' }, 400);
+  if (file.size > 5 * 1024 * 1024) return json({ error: 'too_big' }, 400);
+
+  const ext = type.split('/')[1].replace('jpeg', 'jpg');
+  const key = `req/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  await env.BUCKET.put(key, file.stream(), { httpMetadata: { contentType: type } });
+
+  return json({ ok: true, url: `/api/img/${key}` });
 }
 
 /* ------------------------------------------------------------------ *
@@ -869,7 +911,8 @@ async function menuClassify(request, env) {
 
 /** 숙제 처리 상태 변경 (일괄 지원) */
 async function itemStatus(request, env) {
-  const { targets, status, done_ref, memo, resolved_label, image_url } = await request.json().catch(() => ({}));
+  const { targets, status, done_ref, memo, resolved_label, image_url, reply } =
+    await request.json().catch(() => ({}));
   if (!Array.isArray(targets) || targets.length === 0) return json({ error: 'bad_request' }, 400);
   if (!['pending', 'scheduled', 'done', 'void'].includes(status)) return json({ error: 'bad_status' }, 400);
 
@@ -887,14 +930,18 @@ async function itemStatus(request, env) {
                 done_ref       = COALESCE(?2, done_ref),
                 memo           = COALESCE(?3, memo),
                 resolved_label = COALESCE(?4, resolved_label),
-                image_url      = COALESCE(?5, image_url)
-          WHERE order_idx = ?6 AND seq = ?7`
+                image_url      = COALESCE(?5, image_url),
+                reply          = COALESCE(?6, reply),
+                reply_at       = CASE WHEN ?6 IS NULL THEN reply_at
+                                      ELSE datetime('now','+9 hours') END
+          WHERE order_idx = ?7 AND seq = ?8`
       ).bind(
         status,
         keep(done_ref),
         keep(t.memo ?? memo),
         keep(t.resolved_label ?? resolved_label),
         keep(t.image_url ?? image_url),
+        keep(t.reply ?? reply),
         String(t.order_idx),
         Number(t.seq)
       )

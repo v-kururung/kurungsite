@@ -100,18 +100,49 @@
 /* ───── 요청 작성칸 ───── */
 .oform{grid-column:1/-1;margin:2px 0 4px;padding:14px 16px;border-radius:14px;
   background:var(--page);border:1px solid var(--line)}
-.oform.saved{border-color:var(--pink);background:var(--pink-soft)}
-.oform .guide{font-size:15px;line-height:1.55;color:var(--ink);
-  background:var(--accent-soft);border-radius:10px;padding:9px 13px;margin-bottom:9px}
+.oform.saved{border-color:var(--pink)}
+/* 안내 문구는 배경 없이 한 줄로만 */
+.oform .guide{font-size:14px;line-height:1.6;color:var(--sub);margin-bottom:9px}
+
+/* 이미지 첨부 */
+.odrop{display:flex;align-items:center;gap:10px;margin-top:9px;padding:10px 13px;
+  border:1px dashed var(--line);border-radius:10px;background:var(--card);cursor:pointer;
+  transition:border-color .15s,background .15s}
+.odrop:hover,.odrop.over{border-color:var(--pink);background:var(--pink-soft)}
+.odrop .txt{font-size:14px;color:var(--sub);line-height:1.5}
+.odrop img{width:42px;height:42px;object-fit:cover;border-radius:8px;
+  border:1px solid var(--line);flex:0 0 auto}
+.odrop .x{margin-left:auto;border:0;background:none;color:var(--sub);font-size:15px;
+  cursor:pointer;padding:2px 5px}
+.odrop .x:hover{color:#d64545}
+
+/* 이메일 */
+.omail{display:block;margin-top:9px}
+.omail input{width:100%;box-sizing:border-box;padding:10px 14px;border:1px solid var(--line);
+  border-radius:10px;background:var(--card);font-family:var(--body);font-size:15px;color:var(--ink)}
+.omail input:focus{outline:2px solid var(--pink);outline-offset:-1px;border-color:transparent}
+
+/* 답변 */
+.oreply{margin-top:10px;padding:11px 14px;border-radius:10px;
+  background:var(--card);border:1px solid var(--pink)}
+.oreply .who{display:block;font-size:14px;font-weight:700;color:var(--pink-text);margin-bottom:4px}
+.oreply .txt{font-size:15px;line-height:1.6;color:var(--ink);white-space:pre-wrap;word-break:break-word}
+.oreply .at{display:block;margin-top:5px;font-size:14px;color:var(--sub);opacity:.8}
 .oform textarea{display:block;width:100%;min-height:92px;padding:12px 15px;
   border:1px solid var(--line);border-radius:12px;background:var(--card);
   font-family:var(--body);font-size:16px;line-height:1.65;color:var(--ink);resize:vertical}
 .oform textarea::placeholder{color:var(--sub);opacity:.75}
 .oform textarea:focus{outline:2px solid var(--pink);outline-offset:-1px;border-color:transparent}
-.oform .act{display:flex;align-items:center;gap:10px;margin-top:10px}
+.oform .act{display:flex;align-items:center;gap:12px;margin-top:10px}
 .oform .msg{font-size:14px;color:var(--sub)}
 .oform .msg.ok{color:var(--pink-text);font-weight:600}
 .oform .len{margin-left:auto;font-size:14px;color:var(--sub);opacity:.7}
+/* 저장은 오른쪽 아래에 작게 */
+.oform .save{flex:0 0 auto;padding:6px 16px;border:1px solid var(--pink);border-radius:7px;
+  background:var(--card);font-family:var(--body);font-size:14px;font-weight:600;
+  color:var(--pink-text);cursor:pointer;transition:background .18s,color .18s}
+.oform .save:hover{background:var(--pink);color:var(--ink)}
+.oform .save:disabled{opacity:.5;cursor:default}
 
 .oempty{text-align:center;padding:52px 0;color:var(--sub)}
 .oempty .emo{font-size:40px;margin-bottom:10px}
@@ -257,17 +288,40 @@ function card(d){
 
 function formHtml(it, mine){
   var written = !!(mine.request && mine.request.trim());
+  var img = mine.request_image || '';
   return '<div class="oform'+(written?' saved':'')+'" data-form="'+esc(keyOf(it))+'">'
-       +   '<p class="guide">'+esc(mine.input_label || '원하시는 내용을 자유롭게 적어주세요')+'</p>'
-       +   '<textarea maxlength="1000" placeholder="여기에 적어주세요">'+esc(mine.request||'')+'</textarea>'
+       +   (mine.input_label ? '<p class="guide">'+esc(mine.input_label)+'</p>' : '')
+       +   '<textarea maxlength="1000" placeholder="요청 사항을 작성해주세요.">'
+       +     esc(mine.request||'')+'</textarea>'
+
+       +   '<div class="odrop" data-img="'+esc(img)+'">'+dropInner(img)+'</div>'
+       +   '<input type="file" accept="image/*" hidden>'
+
+       +   '<label class="omail"><input type="email" maxlength="200" '
+       +     'placeholder="연락받을 이메일 (선택)" value="'+esc(mine.request_email||'')+'"></label>'
+
+       +   (mine.reply
+             ? '<div class="oreply"><span class="who">답변</span>'
+               + '<span class="txt">'+esc(mine.reply)+'</span>'
+               + (mine.reply_at ? '<span class="at">'+String(mine.reply_at).slice(5,16)+'</span>' : '')
+               + '</div>'
+             : '')
+
        +   '<div class="act">'
-       +     '<button class="obtn" type="button" data-save="1">저장</button>'
        +     '<span class="msg">'
        +       (mine.request_at ? '마지막 저장 '+String(mine.request_at).slice(5,16) : '')
        +     '</span>'
        +     '<span class="len"></span>'
+       +     '<button class="save" type="button" data-save="1">저장</button>'
        +   '</div>'
        + '</div>';
+}
+
+function dropInner(url){
+  return url
+    ? '<img src="'+esc(url)+'" alt=""><span class="txt">이미지를 첨부했어요</span>'
+      + '<button type="button" class="x" title="첨부 떼기">✕</button>'
+    : '<span class="txt">이미지를 붙여넣거나 끌어다 놓으세요 · 눌러서 고를 수도 있어요</span>';
 }
 
 /* 코드가 맞으면 대기 항목 아래에 작성칸을 끼워 넣습니다 */
@@ -293,9 +347,73 @@ function openForms(cardEl, donor, data, code){
 
     var btn = box.querySelector('[data-save]');
     btn.addEventListener('click', function(){ saveReq(box, code, btn); });
+
+    bindDrop(box, code);
   });
 
   return any;
+}
+
+/* 이미지 첨부 — 붙여넣기·끌어놓기·클릭 모두 받습니다 */
+function bindDrop(box, code){
+  var drop = box.querySelector('.odrop');
+  var file = box.querySelector('input[type=file]');
+
+  var redraw = function(){
+    drop.innerHTML = dropInner(drop.dataset.img || '');
+    var x = drop.querySelector('.x');
+    if(x) x.addEventListener('click', function(e){
+      e.stopPropagation();
+      drop.dataset.img = '';
+      redraw();
+    });
+  };
+  redraw();
+
+  var send = async function(f){
+    if(!f) return;
+    if(!/^image\//.test(f.type)){ alert('이미지 파일만 올릴 수 있어요'); return; }
+    if(f.size > 5*1024*1024){ alert('이미지는 5MB까지 올릴 수 있어요'); return; }
+
+    drop.querySelector('.txt').textContent = '올리는 중…';
+    try{
+      var fd = new FormData();
+      fd.append('code', code);
+      fd.append('file', f, f.name || 'paste.png');
+      var r = await fetch(API+'/roulette/my/upload', { method:'POST', body: fd });
+      var d = await r.json();
+      if(!r.ok) throw new Error(d.error || 'fail');
+      drop.dataset.img = d.url;
+    }catch(e){
+      alert('이미지를 올리지 못했어요');
+    }
+    redraw();
+  };
+
+  drop.addEventListener('click', function(e){
+    if(e.target.closest('.x')) return;
+    file.click();
+  });
+  file.addEventListener('change', function(){ send(file.files[0]); file.value = ''; });
+
+  drop.addEventListener('dragover', function(e){ e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', function(){ drop.classList.remove('over'); });
+  drop.addEventListener('drop', function(e){
+    e.preventDefault(); drop.classList.remove('over');
+    send(e.dataTransfer.files[0]);
+  });
+
+  /* 글 쓰다가 바로 붙여넣기 */
+  box.querySelector('textarea').addEventListener('paste', function(e){
+    var items = (e.clipboardData||{}).items || [];
+    for(var i=0;i<items.length;i++){
+      if(items[i].type && items[i].type.indexOf('image') === 0){
+        e.preventDefault();
+        send(items[i].getAsFile());
+        return;
+      }
+    }
+  });
 }
 
 async function saveReq(box, code, btn){
@@ -310,7 +428,12 @@ async function saveReq(box, code, btn){
     var r = await fetch(API+'/roulette/my', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ code: code, order_idx: p[0], seq: Number(p[1]), request: ta.value })
+      body: JSON.stringify({
+        code: code, order_idx: p[0], seq: Number(p[1]),
+        request: ta.value,
+        request_email: box.querySelector('.omail input').value.trim(),
+        request_image: box.querySelector('.odrop').dataset.img || ''
+      })
     });
     if(!r.ok) throw new Error('HTTP '+r.status);
     msg.textContent = '저장했어요 🌿';

@@ -130,6 +130,9 @@
       '  <span class="rl-count" id="rlPicked"></span>',
       '  <input id="rlMemo" placeholder="비고 (선택)" autocomplete="off">',
       '  <input id="rlRef" placeholder="게시글 URL (선택)" autocomplete="off">',
+      '</div>',
+      '<div class="rl-dock-row">',
+      '  <input id="rlReply" placeholder="시청자에게 보일 답변 (선택)" autocomplete="off">',
       '  <div class="rl-acts">',
       '    <button class="btn" data-st="done">완료</button>',
       '    <button class="btn sub" data-st="pending">대기</button>',
@@ -504,9 +507,21 @@
         if (it.memo) extra.push(esc(it.memo));
 
         /* 시청자가 남긴 요청 */
-        var req = it.request
-          ? '<div class="rl-req"><b>요청</b> ' + esc(it.request) + '</div>'
-          : (needsInput(it.label) ? '<div class="rl-req wait">요청 기다리는 중</div>' : '');
+        var req = '';
+        if (it.request || it.request_image || it.request_email) {
+          req = '<div class="rl-req"><b>요청</b> ' + esc(it.request || '') +
+            (it.request_email
+              ? '<span class="rl-mail">✉ ' + esc(it.request_email) + '</span>' : '') +
+            (it.request_image
+              ? '<a class="rl-shot" href="' + esc(it.request_image) + '" target="_blank">' +
+                '<img src="' + esc(it.request_image) + '" alt=""></a>' : '') +
+            '</div>';
+        } else if (needsInput(it.label)) {
+          req = '<div class="rl-req wait">요청 기다리는 중</div>';
+        }
+        if (it.reply) {
+          req += '<div class="rl-req reply"><b>답변</b> ' + esc(it.reply) + '</div>';
+        }
 
         var right =
           (it.image_url ? '<a class="rl-shot" href="' + esc(it.image_url) + '" target="_blank">' +
@@ -793,6 +808,7 @@
     if (!p) return;
     dock.querySelector('#rlMemo').value = p.item.memo || '';
     dock.querySelector('#rlRef').value = p.item.done_ref || '';
+    dock.querySelector('#rlReply').value = p.item.reply || '';
     state.image = p.item.image_url || '';
     renderDrop();
   }
@@ -801,6 +817,7 @@
     state.image = '';
     dock.querySelector('#rlMemo').value = '';
     dock.querySelector('#rlRef').value = '';
+    dock.querySelector('#rlReply').value = '';
     renderDrop();
   }
 
@@ -847,6 +864,7 @@
 
     var memo = dock.querySelector('#rlMemo').value.trim();
     var ref = dock.querySelector('#rlRef').value.trim();
+    var reply = dock.querySelector('#rlReply').value.trim();
 
     try {
       await api('/items/status', {
@@ -858,6 +876,7 @@
           memo: memo,
           done_ref: ref,
           image_url: state.image,
+          reply: reply,
         },
       });
       say(p.item.label + ' → ' + STATUS[status]);
@@ -1028,6 +1047,10 @@
     'font-size:13px;color:#333d4b;line-height:1.5;white-space:pre-wrap;word-break:break-word}',
     '.rl-req b{color:#1b64da;font-size:12px;margin-right:5px}',
     '.rl-req.wait{color:#b0b8c1;font-style:italic}',
+    '.rl-req.reply{background:#eef6ff}',
+    '.rl-req.reply b{color:#0f8b4c}',
+    '.rl-req .rl-mail{display:inline-block;margin-left:8px;font-size:12px;color:#6b7684}',
+    '.rl-req .rl-shot{display:inline-block;margin-left:8px;vertical-align:middle}',
     '.rl-ed:hover{color:#3182f6}',
     '.rl-edit{display:none;margin:4px 0 10px;padding:12px 13px;border-radius:11px;',
     'background:#f8f9fa;border:1px solid #e5e8eb}',
@@ -1055,6 +1078,7 @@
     '.rl-count{font-size:13px;color:#1b64da;font-weight:700;white-space:nowrap}',
     '.rl-dock input{padding:8px 11px;border:1px solid #d1d6db;border-radius:8px;font:inherit;font-size:13px;background:#fff}',
     '.rl-dock #rlMemo{flex:3;min-width:220px}',
+    '.rl-dock #rlReply{flex:1;min-width:240px}',
     '.rl-dock #rlRef{flex:2;min-width:160px}',
     '.rl-acts{display:flex;gap:6px;margin-left:auto}',
     '.rl-drop{flex:1;display:flex;align-items:center;gap:9px;padding:9px 12px;',
