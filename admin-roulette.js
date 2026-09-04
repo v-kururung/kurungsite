@@ -601,9 +601,19 @@
           } catch (e) { say('발급 실패: ' + e.message); return; }
         }
 
+        var dots = '•'.repeat(Math.min(code.length, 10));
+
+        /* 이미 보이는 상태면 다시 가립니다 */
+        if (b.classList.contains('open')) {
+          b.classList.remove('open');
+          b.querySelector('i').textContent = dots;
+          b.title = '눌러서 코드 보기·복사';
+          return;
+        }
+
         b.classList.add('open');
         b.querySelector('i').textContent = code;
-        b.title = '눌러서 다시 복사';
+        b.title = '눌러서 다시 가리기';
         try { await navigator.clipboard.writeText(code); say('코드 ' + code + ' 복사했어요'); }
         catch (e) { say('코드: ' + code); }
       });

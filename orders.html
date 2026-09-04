@@ -18,13 +18,14 @@
   background:var(--card);font-family:var(--body);font-size:15px;color:var(--ink)}
 .osearch input:focus{outline:2px solid var(--pink);outline-offset:-1px;border-color:transparent}
 
-/* 정렬 */
-.osort{display:flex;gap:6px;margin:-6px 0 16px}
-.osort button{font-family:var(--body);font-size:14px;font-weight:600;padding:5px 14px;
-  border-radius:7px;cursor:pointer;color:var(--sub);background:var(--card);
-  border:1px solid var(--line);transition:background .15s,color .15s,border-color .15s}
-.osort button:hover{border-color:var(--sub2)}
-.osort button.on{color:var(--pink-text);background:var(--pink-soft);border-color:var(--pink)}
+/* 정렬 — 버튼 티를 내지 않고 글자로만 */
+.osort{display:flex;justify-content:flex-end;align-items:center;gap:9px;margin:-6px 0 16px}
+.osort button{border:0;background:none;padding:2px 0;cursor:pointer;
+  font-family:var(--body);font-size:14px;font-weight:500;color:var(--sub);
+  transition:color .15s}
+.osort button:hover{color:var(--ink)}
+.osort button.on{color:var(--pink-text);font-weight:700}
+.osort .bar{color:var(--line);font-size:13px;user-select:none}
 
 /* ───── 후원자 카드 ───── */
 .olist{display:flex;flex-direction:column;gap:11px}
@@ -143,6 +144,7 @@
   <div class="osum" id="oSum"></div>
   <div class="osort" id="oSort">
     <button type="button" data-sort="old" class="on">과거순</button>
+    <span class="bar">|</span>
     <button type="button" data-sort="new">최신순</button>
   </div>
   <div class="olist" id="oList"></div>
