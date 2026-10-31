@@ -26,8 +26,8 @@
   /* 시청자 방송국 주소 — https://www.sooplive.com/station/<아이디> */
   var station = function (id) { return 'https://www.sooplive.com/station/' + encodeURIComponent(id); };
 
-  var KIND = { instant: '즉시', task: '숙제', meta: '제외', unknown: '미분류' };
-  var STATUS = { pending: '대기', scheduled: '예정', done: '완료', void: '제외' };
+  var KIND = { instant: '즉시', task: '숙제', meta: '제외', coupon: '쿠폰', unknown: '미분류' };
+  var STATUS = { pending: '대기', scheduled: '예정', done: '완료', void: '제외', held: '보유', used: '사용' };
 
   var state = {
     status: 'pending', q: '', offset: 0,
@@ -131,6 +131,13 @@
       '  <input id="rlMemo" placeholder="비고 (선택)" autocomplete="off">',
       '  <input id="rlRef" placeholder="게시글 URL (선택)" autocomplete="off">',
       '</div>',
+      '<div class="rl-dock-row rl-coupon-row" style="display:none">',
+      '  <span class="rl-coupon-lbl">어느 숙제에 쓸까요?</span>',
+      '  <select id="rlCouponTarget"></select>',
+      '  <input id="rlCouponLabel" placeholder="승급 후 이름 (비우면 일반→스페셜)" autocomplete="off">',
+      '  <button class="btn" data-coupon="use" type="button">사용 처리</button>',
+      '  <button class="btn sub" data-coupon="undo" type="button" style="display:none">사용 취소</button>',
+      '</div>',
       '<div class="rl-dock-row">',
       '  <input id="rlReply" placeholder="시청자에게 보일 답변 (선택)" autocomplete="off">',
       '  <div class="rl-acts">',
@@ -154,6 +161,8 @@
       if (!b) return;
       if (b.dataset.st) apply(b.dataset.st);
       else if (b.dataset.clear) clearPick();
+      else if (b.dataset.coupon === 'use') couponUse();
+      else if (b.dataset.coupon === 'undo') couponUndo();
     });
 
     var drop = d.querySelector('#rlDrop');
@@ -246,7 +255,7 @@
 
   function menuRow(items, withInput) {
     return items.map(function (m) {
-      var seg = ['instant', 'task', 'meta'].map(function (k) {
+      var seg = ['instant', 'task', 'meta', 'coupon'].map(function (k) {
         return '<button class="rl-k' + (m.kind === k ? ' on' : '') + '" data-k="' + k +
           '" data-key="' + esc(m.label_key) + '">' + KIND[k] + '</button>';
       }).join('');
@@ -311,7 +320,7 @@
       wrap.innerHTML = '<p class="rl-empty">아직 등록된 항목이 없어요</p>';
       return;
     }
-    var order = { unknown: 0, task: 1, instant: 2, meta: 3 };
+    var order = { unknown: 0, task: 1, coupon: 2, instant: 3, meta: 4 };
     var sorted = state.menu.slice().sort(function (a, b) {
       return (order[a.kind] - order[b.kind]) || String(a.label).localeCompare(String(b.label), 'ko');
     });
@@ -504,6 +513,11 @@
         var k = key(o.idx, it.seq);
         var extra = [];
         if (it.resolved_label) extra.push('→ <b>' + esc(it.resolved_label) + '</b>');
+        if (it.coupon_used) extra.push('<span class="rl-cp">🎟 교환권 승급</span>');
+        if (it.kind === 'coupon' && it.status === 'used' && it.used_for) {
+          var tgt = findItemByKey(it.used_for);
+          extra.push('<span class="rl-cp">🎟 ' + esc(tgt ? tgt.label : '사용됨') + ' 에 사용</span>');
+        }
         if (it.memo) extra.push(esc(it.memo));
 
         /* 시청자가 남긴 요청 */
@@ -800,6 +814,81 @@
     dock.querySelector('#rlPicked').textContent = p.item.label;
     dock.classList.add('on');
     target.insertAdjacentElement('afterend', dock);
+    setCouponMode(p);
+  }
+
+  /* 쿠폰을 골랐으면 상태 버튼 대신 사용 처리 줄을 보여줍니다 */
+  function setCouponMode(p) {
+    var isCoupon = p.item.kind === 'coupon';
+    var row = dock.querySelector('.rl-coupon-row');
+    var acts = dock.querySelector('.rl-acts');
+    row.style.display = isCoupon ? '' : 'none';
+    acts.querySelectorAll('button[data-st]').forEach(function (b) {
+      b.style.display = isCoupon ? 'none' : '';
+    });
+    if (!isCoupon) return;
+
+    var used = p.item.status === 'used';
+    dock.querySelector('[data-coupon="use"]').style.display = used ? 'none' : '';
+    dock.querySelector('[data-coupon="undo"]').style.display = used ? '' : 'none';
+    var sel = dock.querySelector('#rlCouponTarget');
+    var inp = dock.querySelector('#rlCouponLabel');
+    sel.style.display = inp.style.display = used ? 'none' : '';
+    dock.querySelector('.rl-coupon-lbl').textContent = used ? '이미 사용한 쿠폰입니다' : '어느 숙제에 쓸까요?';
+    if (used) return;
+
+    /* 같은 후원자의 대기 숙제만 후보로 */
+    var donor = p.order.donor_id;
+    var opts = [];
+    state.orders.forEach(function (o) {
+      if (o.donor_id !== donor) return;
+      o.items.forEach(function (it) {
+        if (it.kind === 'coupon' || it.status !== 'pending') return;
+        opts.push('<option value="' + esc(key(o.idx, it.seq)) + '">' +
+          esc(it.resolved_label || it.label) + ' · ' + when(o.donated_at).slice(5) + '</option>');
+      });
+    });
+    sel.innerHTML = opts.length ? opts.join('') : '<option value="">대기 중인 숙제가 없어요</option>';
+    inp.value = '';
+  }
+
+  function findItemByKey(k) {
+    var p = String(k || '').split('::');
+    var o = findOrder(p[0]);
+    return o && o.items.filter(function (x) { return x.seq === Number(p[1]); })[0];
+  }
+
+  async function couponUse() {
+    var p = picked();
+    if (!p) return;
+    var target = dock.querySelector('#rlCouponTarget').value;
+    if (!target) { say('쓸 숙제를 골라주세요'); return; }
+    var t = target.split('::');
+    try {
+      var r = await api('/coupon/use', {
+        method: 'POST',
+        body: {
+          order_idx: p.order.idx, seq: p.item.seq,
+          target_order_idx: t[0], target_seq: Number(t[1]),
+          new_label: dock.querySelector('#rlCouponLabel').value.trim(),
+        },
+      });
+      say('🎟 ' + r.new_label + ' 로 승급했어요');
+      state.pick = null;
+      await refresh();
+    } catch (e) { say('사용 처리 실패: ' + e.message); }
+  }
+
+  async function couponUndo() {
+    var p = picked();
+    if (!p) return;
+    if (!confirm('쿠폰 사용을 취소할까요?\n승급 표시도 되돌아갑니다.')) return;
+    try {
+      await api('/coupon/undo', { method: 'POST', body: { order_idx: p.order.idx, seq: p.item.seq } });
+      say('쿠폰을 되돌렸어요');
+      state.pick = null;
+      await refresh();
+    } catch (e) { say('취소 실패: ' + e.message); }
   }
 
   /* 고른 항목의 기존 값을 처리 바에 채웁니다 */
@@ -990,6 +1079,13 @@
     '.rl-st{font-size:12px;padding:2px 8px;border-radius:6px;background:#f2f4f6;color:#8b95a1;white-space:nowrap}',
     '.rl-st.rl-pending{background:#fff3e0;color:#c56b00}',
     '.rl-st.rl-done{background:#e8f7ee;color:#0f8b4c}',
+    '.rl-st.rl-held{background:#f3edff;color:#6b3fd1}',
+    '.rl-st.rl-used{background:#f2f4f6;color:#8b95a1}',
+    '.rl-cp{color:#6b3fd1;font-weight:600}',
+    '.rl-coupon-lbl{font-size:13px;color:#6b3fd1;font-weight:600;white-space:nowrap}',
+    '.rl-dock #rlCouponTarget{flex:2;min-width:200px;padding:8px 11px;border:1px solid #d1d6db;',
+    'border-radius:8px;font:inherit;font-size:13px;background:#fff}',
+    '.rl-dock #rlCouponLabel{flex:1;min-width:170px}',
     '.rl-ref{font-size:12px;color:#3182f6;white-space:nowrap}',
     '.rl-shot img{width:26px;height:26px;object-fit:cover;border-radius:6px;border:1px solid #e5e8eb;display:block}',
     '.rl-empty{text-align:center;color:#8b95a1;padding:36px 0;font-size:14px}',

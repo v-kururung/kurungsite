@@ -88,6 +88,23 @@ export function parseRecord(r) {
   };
 }
 
+/**
+ * 분류별 첫 상태
+ *   instant → done    방송 중 바로 끝남
+ *   meta    → void    다음 룰렛 2배처럼 해줄 일이 없음
+ *   coupon  → held    교환권처럼 들고 있다가 다른 숙제에 얹어 쓰는 것
+ *   그 외   → pending 숙제
+ */
+function statusForKind(kind) {
+  if (kind === 'instant') return 'done';
+  if (kind === 'meta') return 'void';
+  if (kind === 'coupon') return 'held';
+  return 'pending';
+}
+
+/* 숙제 카운트에서 빼는 분류 */
+const NOT_TASK = `('instant','meta','coupon')`;
+
 /** bice0905 → bic***05 */
 function maskId(id) {
   if (!id) return '';
@@ -142,6 +159,8 @@ export async function handleRoulette({ request, env, parts, admin }) {
 
     if (sub === 'menu' && m === 'GET') return admin ? await menuList(env) : denied();
     if (sub === 'menu' && m === 'POST') return admin ? await menuClassify(request, env) : denied();
+    if (sub === 'coupon' && sub2 === 'use' && m === 'POST') return admin ? await couponUse(request, env) : denied();
+    if (sub === 'coupon' && sub2 === 'undo' && m === 'POST') return admin ? await couponUndo(request, env) : denied();
     if (sub === 'items' && sub2 === 'status' && m === 'POST') {
       return admin ? await itemStatus(request, env) : denied();
     }
@@ -223,7 +242,7 @@ async function sync(request, env) {
     for (const it of o.items) {
       const kind = menu.get(it.label_key) ?? 'unknown';
       const instant = kind === 'instant';
-      const status = instant ? 'done' : kind === 'meta' ? 'void' : 'pending';
+      const status = statusForKind(kind);
       stmts.push(
         env.DB.prepare(
           `INSERT OR IGNORE INTO roulette_items
@@ -245,7 +264,7 @@ async function sync(request, env) {
       if (kind === null) return;
       if ((res?.meta?.changes ?? 0) > 0) {
         newItems++;
-        if (kind !== 'instant' && kind !== 'meta') newTasks++;
+        if (kind !== 'instant' && kind !== 'meta' && kind !== 'coupon') newTasks++;
       }
     });
     cursor += part.length;
@@ -301,8 +320,12 @@ async function list(request, env, admin) {
   /* 주문을 고를 때 쓰는 조건 — 상태 필터를 포함합니다 */
   const itemCond = [];
   const itemArgs = [];
+  /* 관리자 목록에는 쿠폰(보유/사용)도 함께 보입니다.
+     대기 탭이면 보유 중인 쿠폰, 완료 탭이면 사용한 쿠폰이 같이 나옵니다. */
   if (scope === 'task') itemCond.push(`i.kind NOT IN ('instant','meta')`);
-  if (status) { itemCond.push(`i.status = ?`); itemArgs.push(status); }
+  if (status === 'pending') itemCond.push(`i.status IN ('pending','held')`);
+  else if (status === 'done') itemCond.push(`i.status IN ('done','used')`);
+  else if (status) { itemCond.push(`i.status = ?`); itemArgs.push(status); }
   const itemWhere = itemCond.length ? ` AND ${itemCond.join(' AND ')}` : '';
 
   /* 화면에도 같은 조건을 그대로 적용합니다.
@@ -315,7 +338,9 @@ async function list(request, env, admin) {
   const searchItemCond = [];
   const searchItemArgs = [];
   if (scope === 'task') searchItemCond.push(`s.kind NOT IN ('instant','meta')`);
-  if (status) { searchItemCond.push(`s.status = ?`); searchItemArgs.push(status); }
+  if (status === 'pending') searchItemCond.push(`s.status IN ('pending','held')`);
+  else if (status === 'done') searchItemCond.push(`s.status IN ('done','used')`);
+  else if (status) { searchItemCond.push(`s.status = ?`); searchItemArgs.push(status); }
   const searchItemWhere = searchItemCond.length ? ` AND ${searchItemCond.join(' AND ')}` : '';
 
   const searchWhere = q
@@ -331,9 +356,9 @@ async function list(request, env, admin) {
   const ordersQ = await env.DB.prepare(
     `SELECT o.*,
        (SELECT COUNT(*) FROM roulette_items t
-         WHERE t.order_idx = o.idx AND t.kind NOT IN ('instant','meta')) AS task_total,
+         WHERE t.order_idx = o.idx AND t.kind NOT IN ${NOT_TASK}) AS task_total,
        (SELECT COUNT(*) FROM roulette_items t
-         WHERE t.order_idx = o.idx AND t.kind NOT IN ('instant','meta') AND t.status = 'done') AS task_done,
+         WHERE t.order_idx = o.idx AND t.kind NOT IN ${NOT_TASK} AND t.status = 'done') AS task_done,
        (SELECT c.code FROM roulette_codes c WHERE c.donor_id = o.donor_id) AS code
        FROM roulette_orders o
       WHERE EXISTS (SELECT 1 FROM roulette_items i WHERE i.order_idx = o.idx${itemWhere})
@@ -349,7 +374,9 @@ async function list(request, env, admin) {
   const itemsQ = await env.DB.prepare(
     `SELECT order_idx, seq, label, percent, kind, status, done_at, done_ref, memo,
             resolved_label, image_url, request, request_at,
-            request_image, request_email, reply, reply_at
+            request_image, request_email, reply, reply_at, used_for,
+            (SELECT COUNT(*) FROM roulette_items c
+              WHERE c.used_for = roulette_items.order_idx || '::' || roulette_items.seq) AS coupon_used
        FROM roulette_items
       WHERE order_idx IN (${ids.map(() => '?').join(',')})${showWhere}
       ORDER BY seq`
@@ -406,7 +433,7 @@ async function donors(request, env) {
        JOIN roulette_items i ON i.order_idx = o.idx
       WHERE i.kind NOT IN ('instant','meta') ${where}
       GROUP BY o.donor_id
-     HAVING pending > 0 OR done > 0
+     HAVING pending > 0 OR done > 0 OR SUM(CASE WHEN i.status = 'held' THEN 1 ELSE 0 END) > 0
       ORDER BY ${newest
         ? 'last_donated DESC'
         : '(oldest_pending IS NULL), oldest_pending ASC, pending DESC, last_donated DESC'}`
@@ -427,10 +454,27 @@ async function donors(request, env) {
        JOIN roulette_orders o ON o.idx = i.order_idx
        LEFT JOIN roulette_menu mn ON mn.label_key = i.label_key
       WHERE i.status IN ('pending','done')
-        AND i.kind NOT IN ('instant','meta')
+        AND i.kind NOT IN ${NOT_TASK}
         AND o.donor_id IN (${ids.map(() => '?').join(',')})
       ORDER BY o.donated_at ASC, i.seq ASC`
   ).bind(...ids).all();
+
+  /* 보유 중인 쿠폰과, 어느 숙제에 쿠폰을 썼는지 */
+  const coupons = await env.DB.prepare(
+    `SELECT o.donor_id, i.label, i.status, i.used_for
+       FROM roulette_items i
+       JOIN roulette_orders o ON o.idx = i.order_idx
+      WHERE i.kind = 'coupon'
+        AND i.status IN ('held','used')
+        AND o.donor_id IN (${ids.map(() => '?').join(',')})`
+  ).bind(...ids).all();
+
+  const heldBy = new Map(ids.map((id) => [id, []]));
+  const usedOn = new Set();
+  coupons.results.forEach((c) => {
+    if (c.status === 'held') heldBy.get(c.donor_id)?.push(c.label);
+    else if (c.used_for) usedOn.add(c.used_for);
+  });
 
   const byDonor = new Map(ids.map((id) => [id, { items: [], done: [] }]));
   items.results.forEach((it) => {
@@ -445,6 +489,8 @@ async function donors(request, env) {
       resolved_label: it.resolved_label,
       /* 요청을 적어야 하는 항목인지. 내용 자체는 코드가 있어야 볼 수 있습니다 */
       needs_input: it.needs_input ? 1 : 0,
+      /* 교환권을 얹어 승급된 숙제 */
+      coupon_used: usedOn.has(it.order_idx + '::' + it.seq) ? 1 : 0,
     };
     if (it.status === 'done') bucket.done.push({ ...row, done_at: it.done_at });
     else bucket.items.push(row);
@@ -463,6 +509,10 @@ async function donors(request, env) {
       oldest_pending: d.oldest_pending,
       items: byDonor.get(d.donor_id)?.items || [],
       done_items: byDonor.get(d.donor_id)?.done || [],
+      /* 보유 쿠폰 — 같은 이름끼리 묶어서 개수로 */
+      coupons: Object.entries(
+        (heldBy.get(d.donor_id) || []).reduce((m, l) => (m[l] = (m[l] || 0) + 1, m), {})
+      ).map(([label, count]) => ({ label, count })),
     })),
   });
 }
@@ -474,8 +524,8 @@ async function donors(request, env) {
 async function stats(env) {
   const r = await env.DB.prepare(
     `SELECT
-       SUM(CASE WHEN kind NOT IN ('instant','meta') AND status = 'pending' THEN 1 ELSE 0 END) AS pending,
-       SUM(CASE WHEN kind NOT IN ('instant','meta') AND status = 'done'    THEN 1 ELSE 0 END) AS done,
+       SUM(CASE WHEN kind NOT IN ${NOT_TASK} AND status = 'pending' THEN 1 ELSE 0 END) AS pending,
+       SUM(CASE WHEN kind NOT IN ${NOT_TASK} AND status = 'done'    THEN 1 ELSE 0 END) AS done,
        SUM(CASE WHEN kind = 'unknown' THEN 1 ELSE 0 END)                                      AS unclassified
      FROM roulette_items`
   ).first();
@@ -558,7 +608,7 @@ async function manualAdd(request, env) {
   for (const it of items) {
     const kind = menu.get(it.label_key) ?? 'unknown';
     const instant = kind === 'instant';
-    const status = instant ? 'done' : kind === 'meta' ? 'void' : 'pending';
+    const status = statusForKind(kind);
     stmts.push(
       env.DB.prepare(
         `INSERT OR IGNORE INTO roulette_items
@@ -858,12 +908,9 @@ async function menuClassify(request, env) {
     return json({ ok: true });
   }
 
-  if (!label_key || !['instant', 'task', 'meta'].includes(kind)) return json({ error: 'bad_request' }, 400);
+  if (!label_key || !['instant', 'task', 'meta', 'coupon'].includes(kind)) return json({ error: 'bad_request' }, 400);
 
-  // instant = 방송 중 즉시 처리 → 바로 완료
-  // meta    = 다음 룰렛 2배처럼 해줄 일이 없는 항목 → 처리 대상에서 제외
-  // task    = 나중에 해줘야 하는 숙제 → 대기
-  const statusFor = { instant: 'done', meta: 'void', task: 'pending' }[kind];
+  const statusFor = statusForKind(kind);
 
   await env.DB.prepare(`UPDATE roulette_menu SET kind = ?1 WHERE label_key = ?2`)
     .bind(kind, label_key).run();
@@ -896,6 +943,7 @@ async function menuClassify(request, env) {
           AND memo IS NULL AND done_ref IS NULL AND resolved_label IS NULL
           AND (   (kind = 'instant' AND status = 'done')
                OR (kind = 'meta'    AND status = 'void')
+               OR (kind = 'coupon'  AND status = 'held')
                OR (kind = 'task'    AND status = 'pending') )`
     ).bind(kind, label_key, statusFor).run();
     moved += re.meta?.changes ?? 0;
@@ -907,6 +955,90 @@ async function menuClassify(request, env) {
   kept = left?.n ?? 0;
 
   return json({ ok: true, moved, kept });
+}
+
+/* ------------------------------------------------------------------ *
+ * 쿠폰 — 교환권을 다른 숙제에 얹어 승급시킵니다
+ * ------------------------------------------------------------------ */
+
+/** '일반 B' → '스페셜 B'. 규칙에 안 맞으면 그대로 */
+function upgradeLabel(label) {
+  const s = String(label || '');
+  return /일반/.test(s) ? s.replace('일반', '스페셜') : s;
+}
+
+/**
+ * POST /api/roulette/coupon/use
+ * body: { order_idx, seq, target_order_idx, target_seq, new_label? }
+ */
+async function couponUse(request, env) {
+  const b = await request.json().catch(() => ({}));
+  const cKey = [String(b.order_idx || ''), Number(b.seq)];
+  const tKey = [String(b.target_order_idx || ''), Number(b.target_seq)];
+  if (!cKey[0] || !tKey[0] || Number.isNaN(cKey[1]) || Number.isNaN(tKey[1])) {
+    return json({ error: 'bad_request' }, 400);
+  }
+
+  const coupon = await env.DB.prepare(
+    `SELECT i.kind, i.status, o.donor_id FROM roulette_items i
+       JOIN roulette_orders o ON o.idx = i.order_idx
+      WHERE i.order_idx = ?1 AND i.seq = ?2`
+  ).bind(...cKey).first();
+  if (!coupon || coupon.kind !== 'coupon') return json({ error: 'not_coupon' }, 400);
+  if (coupon.status !== 'held') return json({ error: 'already_used' }, 409);
+
+  const target = await env.DB.prepare(
+    `SELECT i.label, i.status, i.kind, i.resolved_label, o.donor_id FROM roulette_items i
+       JOIN roulette_orders o ON o.idx = i.order_idx
+      WHERE i.order_idx = ?1 AND i.seq = ?2`
+  ).bind(...tKey).first();
+  if (!target) return json({ error: 'no_target' }, 404);
+  /* 같은 후원자의 숙제에만 쓸 수 있습니다 */
+  if (target.donor_id !== coupon.donor_id) return json({ error: 'other_donor' }, 403);
+  if (target.kind !== 'task' && target.kind !== 'unknown') return json({ error: 'bad_target' }, 400);
+
+  const newLabel = String(b.new_label || '').trim() || upgradeLabel(target.resolved_label || target.label);
+  const usedFor = `${tKey[0]}::${tKey[1]}`;
+
+  await env.DB.batch([
+    env.DB.prepare(
+      `UPDATE roulette_items
+          SET status = 'used', used_for = ?3, done_at = datetime('now','+9 hours')
+        WHERE order_idx = ?1 AND seq = ?2`
+    ).bind(cKey[0], cKey[1], usedFor),
+    env.DB.prepare(
+      `UPDATE roulette_items SET resolved_label = ?3
+        WHERE order_idx = ?1 AND seq = ?2`
+    ).bind(tKey[0], tKey[1], newLabel),
+  ]);
+
+  return json({ ok: true, new_label: newLabel });
+}
+
+/** POST /api/roulette/coupon/undo — body: { order_idx, seq } (쿠폰 쪽) */
+async function couponUndo(request, env) {
+  const b = await request.json().catch(() => ({}));
+  const cKey = [String(b.order_idx || ''), Number(b.seq)];
+  const coupon = await env.DB.prepare(
+    `SELECT status, used_for FROM roulette_items WHERE order_idx = ?1 AND seq = ?2 AND kind = 'coupon'`
+  ).bind(...cKey).first();
+  if (!coupon) return json({ error: 'not_found' }, 404);
+  if (coupon.status !== 'used' || !coupon.used_for) return json({ error: 'not_used' }, 409);
+
+  const [tIdx, tSeq] = coupon.used_for.split('::');
+  await env.DB.batch([
+    env.DB.prepare(
+      `UPDATE roulette_items SET status = 'held', used_for = NULL, done_at = NULL
+        WHERE order_idx = ?1 AND seq = ?2`
+    ).bind(...cKey),
+    /* 승급 표시만 걷어냅니다. 직접 적은 교체 항목이면 건드리지 않도록 '스페셜' 로 바뀐 경우만 */
+    env.DB.prepare(
+      `UPDATE roulette_items SET resolved_label = NULL
+        WHERE order_idx = ?1 AND seq = ?2 AND resolved_label LIKE '%스페셜%'`
+    ).bind(tIdx, Number(tSeq)),
+  ]);
+
+  return json({ ok: true });
 }
 
 /** 숙제 처리 상태 변경 (일괄 지원) */
