@@ -372,14 +372,15 @@ async function list(request, env, admin) {
 
   const ids = rows.map((r) => r.idx);
   const itemsQ = await env.DB.prepare(
-    `SELECT order_idx, seq, label, percent, kind, status, done_at, done_ref, memo,
-            resolved_label, image_url, request, request_at,
-            request_image, request_email, reply, reply_at, used_for,
+    `SELECT x.order_idx, x.seq, x.label, x.percent, x.kind, x.status, x.done_at, x.done_ref, x.memo,
+            x.resolved_label, x.image_url, x.request, x.request_at,
+            x.request_image, x.request_email, x.reply, x.reply_at, x.used_for,
             (SELECT COUNT(*) FROM roulette_items c
-              WHERE c.used_for = roulette_items.order_idx || '::' || roulette_items.seq) AS coupon_used
-       FROM roulette_items
-      WHERE order_idx IN (${ids.map(() => '?').join(',')})${showWhere}
-      ORDER BY seq`
+              WHERE c.kind = 'coupon'
+                AND c.used_for = x.order_idx || '::' || x.seq) AS coupon_used
+       FROM roulette_items x
+      WHERE x.order_idx IN (${ids.map(() => '?').join(',')})${showWhere.replace(/ AND /g, ' AND x.')}
+      ORDER BY x.seq`
   ).bind(...ids, ...itemArgs).all();
 
   const grouped = new Map(ids.map((id) => [id, []]));
