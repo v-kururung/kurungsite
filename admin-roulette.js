@@ -26,8 +26,8 @@
   /* 시청자 방송국 주소 — https://www.sooplive.com/station/<아이디> */
   var station = function (id) { return 'https://www.sooplive.com/station/' + encodeURIComponent(id); };
 
-  var KIND = { instant: '즉시', task: '숙제', meta: '제외', unknown: '미분류' };
-  var STATUS = { pending: '대기', scheduled: '예정', done: '완료', void: '제외' };
+  var KIND = { instant: '즉시', task: '숙제', meta: '제외', coupon: '쿠폰', unknown: '미분류' };
+  var STATUS = { pending: '대기', scheduled: '예정', done: '완료', void: '제외', held: '보유', used: '사용' };
 
   var state = {
     status: 'pending', q: '', offset: 0,
@@ -105,6 +105,11 @@
       '</div>',
 
       '<div class="box">',
+      '  <h3 class="rl-fold" id="rlBonusHead">보너스 규칙 <span class="rl-arrow">▾</span></h3>',
+      '  <div id="rlBonus" style="display:none"></div>',
+      '</div>',
+
+      '<div class="box">',
       '  <h3>룰렛 숙제</h3>',
       '  <div class="rl-sum" id="rlSum"></div>',
       '  <div class="rl-bar">',
@@ -131,6 +136,13 @@
       '  <input id="rlMemo" placeholder="비고 (선택)" autocomplete="off">',
       '  <input id="rlRef" placeholder="게시글 URL (선택)" autocomplete="off">',
       '</div>',
+      '<div class="rl-dock-row rl-coupon-row" style="display:none">',
+      '  <span class="rl-coupon-lbl">어느 숙제에 쓸까요?</span>',
+      '  <select id="rlCouponTarget"></select>',
+      '  <input id="rlCouponLabel" placeholder="승급 후 이름 (비우면 일반→스페셜)" autocomplete="off">',
+      '  <button class="btn" data-coupon="use" type="button">사용 처리</button>',
+      '  <button class="btn sub" data-coupon="undo" type="button" style="display:none">사용 취소</button>',
+      '</div>',
       '<div class="rl-dock-row">',
       '  <input id="rlReply" placeholder="시청자에게 보일 답변 (선택)" autocomplete="off">',
       '  <div class="rl-acts">',
@@ -154,6 +166,8 @@
       if (!b) return;
       if (b.dataset.st) apply(b.dataset.st);
       else if (b.dataset.clear) clearPick();
+      else if (b.dataset.coupon === 'use') couponUse();
+      else if (b.dataset.coupon === 'undo') couponUndo();
     });
 
     var drop = d.querySelector('#rlDrop');
@@ -246,7 +260,7 @@
 
   function menuRow(items, withInput) {
     return items.map(function (m) {
-      var seg = ['instant', 'task', 'meta'].map(function (k) {
+      var seg = ['instant', 'task', 'meta', 'coupon'].map(function (k) {
         return '<button class="rl-k' + (m.kind === k ? ' on' : '') + '" data-k="' + k +
           '" data-key="' + esc(m.label_key) + '">' + KIND[k] + '</button>';
       }).join('');
@@ -305,13 +319,142 @@
     } catch (e) { say('요청 설정 실패: ' + e.message); }
   }
 
+  /* ───── 보너스 규칙 ─────
+     룰렛과 별개로 금액 조건으로 자동 생성되는 숙제.
+     예) 11월에 정확히 500의 배수로 한 번에 후원 → 500개당 '11월 확정 방셀' 1개 */
+
+  var MODE = { multiple: '정확히 배수일 때만', floor: '단위로 나눠 개수 계산', min: '이상이면 1개' };
+
+  async function renderBonus() {
+    var wrap = document.getElementById('rlBonus');
+    if (!wrap) return;
+    wrap.innerHTML = '<p class="rl-help">불러오는 중…</p>';
+
+    var rules = [];
+    try { rules = (await api('/bonus')).rules || []; }
+    catch (e) { wrap.innerHTML = '<p class="rl-empty">불러오지 못했어요 — ' + esc(e.message) + '</p>'; return; }
+
+    var rows = rules.map(function (r) {
+      var range = (r.from_date || r.to_date)
+        ? (r.from_date || '…') + ' ~ ' + (r.to_date || '…')
+        : '기간 제한 없음';
+      return '<div class="rl-bn-row' + (r.active ? '' : ' off') + '" data-id="' + r.id + '">' +
+        '<div class="rl-bn-main">' +
+        '  <b>' + esc(r.label) + '</b>' +
+        '  <span class="rl-bn-cond">' + r.amount + '개 · ' + (MODE[r.mode] || r.mode) + '</span>' +
+        '  <span class="rl-bn-range">' + esc(range) + '</span>' +
+        '  <span class="rl-bn-stat">지급 ' + r.given + ' · 대기 ' + r.pending + '</span>' +
+        '</div>' +
+        '<div class="rl-bn-act">' +
+        '  <button class="btn sub" data-bn="edit" type="button">수정</button>' +
+        '  <button class="btn sub" data-bn="backfill" type="button" title="지금까지 들어온 후원에 소급 적용">소급 적용</button>' +
+        '  <button class="btn sub" data-bn="toggle" type="button">' + (r.active ? '끄기' : '켜기') + '</button>' +
+        '  <button class="rl-del" data-bn="del" type="button" title="규칙 삭제">✕</button>' +
+        '</div></div>';
+    }).join('');
+
+    wrap.innerHTML =
+      '<p class="rl-help">후원 금액 조건으로 자동 생성되는 숙제입니다. 동기화·수동 등록 때 자동으로 붙고, ' +
+      '<b>소급 적용</b>을 누르면 이미 들어온 후원에도 붙습니다.</p>' +
+      (rows || '<p class="rl-empty">아직 규칙이 없어요</p>') +
+      '<div class="rl-bn-form" id="rlBnForm">' +
+      '  <input type="hidden" id="bnId">' +
+      '  <div class="rl-form">' +
+      '    <label>숙제 이름<input id="bnLabel" placeholder="11월 확정 방셀" autocomplete="off"></label>' +
+      '    <label>별풍선<input id="bnAmount" type="number" min="1" value="500"></label>' +
+      '    <label>조건<select id="bnMode">' +
+             Object.keys(MODE).map(function (k) { return '<option value="' + k + '">' + MODE[k] + '</option>'; }).join('') +
+      '    </select></label>' +
+      '  </div>' +
+      '  <div class="rl-form">' +
+      '    <label>시작일<input id="bnFrom" type="date"></label>' +
+      '    <label>종료일<input id="bnTo" type="date"></label>' +
+      '    <label class="rl-bn-chk"><input id="bnBackfill" type="checkbox" checked> 저장하면서 소급 적용</label>' +
+      '  </div>' +
+      '  <div class="actions">' +
+      '    <span class="stat" id="bnStat"></span>' +
+      '    <button class="btn sub" id="bnReset" type="button" style="display:none">새 규칙</button>' +
+      '    <button class="btn" id="bnSave" type="button">규칙 추가</button>' +
+      '  </div>' +
+      '</div>';
+
+    var byId = {};
+    rules.forEach(function (r) { byId[r.id] = r; });
+
+    wrap.querySelectorAll('button[data-bn]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var id = Number(b.closest('.rl-bn-row').dataset.id);
+        var r = byId[id];
+        var act = b.dataset.bn;
+        if (act === 'edit') fillBonusForm(r);
+        else if (act === 'toggle') saveBonus(Object.assign({}, r, { active: !r.active }), false);
+        else if (act === 'backfill') {
+          if (confirm('"' + r.label + '" 규칙을 지금까지 들어온 후원 전체에 적용할까요?\n이미 붙은 건은 건너뜁니다.')) {
+            saveBonus(r, true);
+          }
+        }
+        else if (act === 'del') {
+          if (confirm('"' + r.label + '" 규칙을 지울까요?\n아직 처리하지 않은 보너스 숙제도 함께 사라집니다. 완료한 건 남습니다.')) {
+            deleteBonus(id);
+          }
+        }
+      });
+    });
+
+    document.getElementById('bnSave').addEventListener('click', function () {
+      saveBonus({
+        id: Number(document.getElementById('bnId').value) || 0,
+        label: document.getElementById('bnLabel').value.trim(),
+        amount: Number(document.getElementById('bnAmount').value) || 0,
+        mode: document.getElementById('bnMode').value,
+        from_date: document.getElementById('bnFrom').value,
+        to_date: document.getElementById('bnTo').value,
+        active: true,
+      }, document.getElementById('bnBackfill').checked);
+    });
+    document.getElementById('bnReset').addEventListener('click', function () { fillBonusForm(null); });
+  }
+
+  function fillBonusForm(r) {
+    document.getElementById('bnId').value = r ? r.id : '';
+    document.getElementById('bnLabel').value = r ? r.label : '';
+    document.getElementById('bnAmount').value = r ? r.amount : 500;
+    document.getElementById('bnMode').value = r ? r.mode : 'multiple';
+    document.getElementById('bnFrom').value = r ? (r.from_date || '') : '';
+    document.getElementById('bnTo').value = r ? (r.to_date || '') : '';
+    document.getElementById('bnSave').textContent = r ? '규칙 저장' : '규칙 추가';
+    document.getElementById('bnReset').style.display = r ? '' : 'none';
+    if (r) document.getElementById('bnLabel').focus();
+  }
+
+  async function saveBonus(rule, backfill) {
+    var stat = document.getElementById('bnStat');
+    if (!rule.label || !rule.amount) { if (stat) stat.textContent = '이름과 별풍선 개수를 채워주세요'; return; }
+    if (stat) stat.textContent = '저장 중…';
+    try {
+      var r = await api('/bonus', { method: 'POST', body: Object.assign({}, rule, { backfill: !!backfill }) });
+      say(backfill ? ('숙제 ' + r.made + '개 붙였어요') : '저장했어요');
+      await renderBonus();
+      await refresh();
+    } catch (e) { if (stat) stat.textContent = '저장 실패 — ' + e.message; }
+  }
+
+  async function deleteBonus(id) {
+    try {
+      await api('/bonus/delete', { method: 'POST', body: { id: id } });
+      say('규칙을 지웠어요');
+      await renderBonus();
+      await refresh();
+    } catch (e) { say('삭제 실패: ' + e.message); }
+  }
+
   function renderMenu() {
     var wrap = document.getElementById('rlMenu');
     if (state.menu.length === 0) {
       wrap.innerHTML = '<p class="rl-empty">아직 등록된 항목이 없어요</p>';
       return;
     }
-    var order = { unknown: 0, task: 1, instant: 2, meta: 3 };
+    var order = { unknown: 0, task: 1, coupon: 2, instant: 3, meta: 4 };
     var sorted = state.menu.slice().sort(function (a, b) {
       return (order[a.kind] - order[b.kind]) || String(a.label).localeCompare(String(b.label), 'ko');
     });
@@ -504,6 +647,11 @@
         var k = key(o.idx, it.seq);
         var extra = [];
         if (it.resolved_label) extra.push('→ <b>' + esc(it.resolved_label) + '</b>');
+        if (it.coupon_used) extra.push('<span class="rl-cp">🎟 교환권 승급</span>');
+        if (it.kind === 'coupon' && it.status === 'used' && it.used_for) {
+          var tgt = findItemByKey(it.used_for);
+          extra.push('<span class="rl-cp">🎟 ' + esc(tgt ? tgt.label : '사용됨') + ' 에 사용</span>');
+        }
         if (it.memo) extra.push(esc(it.memo));
 
         /* 시청자가 남긴 요청 */
@@ -534,7 +682,9 @@
           '<input type="radio" name="rlPick" data-k="' + k + '" data-order="' + esc(o.idx) + '"' +
           (state.pick === k ? ' checked' : '') + '>' +
           '<span class="rl-label">' + esc(it.label) + '</span>' +
-          '<span class="rl-pct">' + it.percent + '%</span>' +
+          (String(it.label_key || '').indexOf('bonus:') === 0
+            ? '<span class="rl-bonus">보너스</span>'
+            : '<span class="rl-pct">' + it.percent + '%</span>') +
           (extra.length ? '<span class="rl-extra">' + extra.join(' · ') + '</span>' : '') +
           '<span class="rl-right">' + right + '</span>' +
           '</label>' + req;
@@ -800,6 +950,81 @@
     dock.querySelector('#rlPicked').textContent = p.item.label;
     dock.classList.add('on');
     target.insertAdjacentElement('afterend', dock);
+    setCouponMode(p);
+  }
+
+  /* 쿠폰을 골랐으면 상태 버튼 대신 사용 처리 줄을 보여줍니다 */
+  function setCouponMode(p) {
+    var isCoupon = p.item.kind === 'coupon';
+    var row = dock.querySelector('.rl-coupon-row');
+    var acts = dock.querySelector('.rl-acts');
+    row.style.display = isCoupon ? '' : 'none';
+    acts.querySelectorAll('button[data-st]').forEach(function (b) {
+      b.style.display = isCoupon ? 'none' : '';
+    });
+    if (!isCoupon) return;
+
+    var used = p.item.status === 'used';
+    dock.querySelector('[data-coupon="use"]').style.display = used ? 'none' : '';
+    dock.querySelector('[data-coupon="undo"]').style.display = used ? '' : 'none';
+    var sel = dock.querySelector('#rlCouponTarget');
+    var inp = dock.querySelector('#rlCouponLabel');
+    sel.style.display = inp.style.display = used ? 'none' : '';
+    dock.querySelector('.rl-coupon-lbl').textContent = used ? '이미 사용한 쿠폰입니다' : '어느 숙제에 쓸까요?';
+    if (used) return;
+
+    /* 같은 후원자의 대기 숙제만 후보로 */
+    var donor = p.order.donor_id;
+    var opts = [];
+    state.orders.forEach(function (o) {
+      if (o.donor_id !== donor) return;
+      o.items.forEach(function (it) {
+        if (it.kind === 'coupon' || it.status !== 'pending') return;
+        opts.push('<option value="' + esc(key(o.idx, it.seq)) + '">' +
+          esc(it.resolved_label || it.label) + ' · ' + when(o.donated_at).slice(5) + '</option>');
+      });
+    });
+    sel.innerHTML = opts.length ? opts.join('') : '<option value="">대기 중인 숙제가 없어요</option>';
+    inp.value = '';
+  }
+
+  function findItemByKey(k) {
+    var p = String(k || '').split('::');
+    var o = findOrder(p[0]);
+    return o && o.items.filter(function (x) { return x.seq === Number(p[1]); })[0];
+  }
+
+  async function couponUse() {
+    var p = picked();
+    if (!p) return;
+    var target = dock.querySelector('#rlCouponTarget').value;
+    if (!target) { say('쓸 숙제를 골라주세요'); return; }
+    var t = target.split('::');
+    try {
+      var r = await api('/coupon/use', {
+        method: 'POST',
+        body: {
+          order_idx: p.order.idx, seq: p.item.seq,
+          target_order_idx: t[0], target_seq: Number(t[1]),
+          new_label: dock.querySelector('#rlCouponLabel').value.trim(),
+        },
+      });
+      say('🎟 ' + r.new_label + ' 로 승급했어요');
+      state.pick = null;
+      await refresh();
+    } catch (e) { say('사용 처리 실패: ' + e.message); }
+  }
+
+  async function couponUndo() {
+    var p = picked();
+    if (!p) return;
+    if (!confirm('쿠폰 사용을 취소할까요?\n승급 표시도 되돌아갑니다.')) return;
+    try {
+      await api('/coupon/undo', { method: 'POST', body: { order_idx: p.order.idx, seq: p.item.seq } });
+      say('쿠폰을 되돌렸어요');
+      state.pick = null;
+      await refresh();
+    } catch (e) { say('취소 실패: ' + e.message); }
   }
 
   /* 고른 항목의 기존 값을 처리 바에 채웁니다 */
@@ -905,6 +1130,14 @@
       if (open) renderAdd();
     });
 
+    document.getElementById('rlBonusHead').addEventListener('click', function () {
+      var box = document.getElementById('rlBonus');
+      var open = box.style.display === 'none';
+      box.style.display = open ? '' : 'none';
+      this.querySelector('.rl-arrow').textContent = open ? '▴' : '▾';
+      if (open) renderBonus();
+    });
+
     document.getElementById('rlMenuHead').addEventListener('click', function () {
       state.menuOpen = !state.menuOpen;
       document.getElementById('rlMenu').style.display = state.menuOpen ? '' : 'none';
@@ -961,6 +1194,20 @@
     '.rl-chip.wait{background:#e8f3ff;color:#1b64da}',
     '.rl-chip.warn{background:#fff3e0;color:#c56b00}',
     '.rl-fold{cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px}',
+    '.rl-bn-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;',
+    'border:1px solid #e5e8eb;border-radius:10px;margin-bottom:8px;background:#fff}',
+    '.rl-bn-row.off{opacity:.55}',
+    '.rl-bn-main{flex:1;min-width:220px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:#6b7684}',
+    '.rl-bn-main b{color:#333d4b;font-size:14px}',
+    '.rl-bn-cond{color:#1b64da}',
+    '.rl-bn-range{color:#8b95a1}',
+    '.rl-bn-stat{font-size:12px;color:#8b95a1}',
+    '.rl-bn-act{display:flex;gap:5px;align-items:center}',
+    '.rl-bn-act .btn{padding:5px 11px;font-size:12px}',
+    '.rl-bn-form{margin-top:12px;padding-top:12px;border-top:1px solid #f2f4f6}',
+    '.rl-bn-form select{padding:8px 11px;border:1px solid #e5e8eb;border-radius:8px;font:inherit;font-size:13px;color:#333d4b}',
+    '.rl-bn-chk{flex-direction:row !important;align-items:center;gap:6px !important;font-size:13px !important;color:#4e5968 !important;align-self:flex-end;padding-bottom:9px}',
+    '.rl-bonus{font-size:11px;font-weight:700;color:#0f8b4c;background:#e8f7ee;padding:1px 7px;border-radius:5px}',
     '.rl-arrow{font-size:12px;color:#b0b8c1}',
     '.rl-bar{display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap}',
     '.rl-bar input{flex:1;min-width:150px;padding:8px 11px;border:1px solid #e5e8eb;border-radius:8px;font:inherit;font-size:13px}',
@@ -990,6 +1237,13 @@
     '.rl-st{font-size:12px;padding:2px 8px;border-radius:6px;background:#f2f4f6;color:#8b95a1;white-space:nowrap}',
     '.rl-st.rl-pending{background:#fff3e0;color:#c56b00}',
     '.rl-st.rl-done{background:#e8f7ee;color:#0f8b4c}',
+    '.rl-st.rl-held{background:#f3edff;color:#6b3fd1}',
+    '.rl-st.rl-used{background:#f2f4f6;color:#8b95a1}',
+    '.rl-cp{color:#6b3fd1;font-weight:600}',
+    '.rl-coupon-lbl{font-size:13px;color:#6b3fd1;font-weight:600;white-space:nowrap}',
+    '.rl-dock #rlCouponTarget{flex:2;min-width:200px;padding:8px 11px;border:1px solid #d1d6db;',
+    'border-radius:8px;font:inherit;font-size:13px;background:#fff}',
+    '.rl-dock #rlCouponLabel{flex:1;min-width:170px}',
     '.rl-ref{font-size:12px;color:#3182f6;white-space:nowrap}',
     '.rl-shot img{width:26px;height:26px;object-fit:cover;border-radius:6px;border:1px solid #e5e8eb;display:block}',
     '.rl-empty{text-align:center;color:#8b95a1;padding:36px 0;font-size:14px}',
