@@ -50,7 +50,10 @@
       body: o.body ? JSON.stringify(o.body) : undefined,
     });
     var data = await res.json().catch(function () { return {}; });
-    if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+    if (!res.ok) {
+      /* 서버가 원인(detail)을 같이 주면 화면에도 보여줍니다 */
+      throw new Error((data.error || ('HTTP ' + res.status)) + (data.detail ? ' — ' + data.detail : ''));
+    }
     return data;
   }
 
@@ -119,7 +122,7 @@
       '      <button data-s="done">완료</button>',
       '      <button data-s="">전체</button>',
       '    </div>',
-      '    <input id="rlQ" placeholder="닉네임 · 아이디 · 보상 이름" autocomplete="off">',
+      '    <input id="rlQ" placeholder="닉네임 · 아이디 · 보상 이름 · 비고 · 게시글 주소" autocomplete="off">',
       '    <button class="btn sub" id="rlSets">확률표 갱신</button>',
       '  </div>',
       '  <div id="rlList" class="rl-list"></div>',

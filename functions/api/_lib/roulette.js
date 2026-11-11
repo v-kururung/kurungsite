@@ -487,7 +487,7 @@ async function maybeSyncSets(env) {
 
 /* ------------------------------------------------------------------ *
  * GET /api/roulette/list — 방문자용 주문내역
- * ?scope=task|all  ?status=pending|done  ?q=닉네임  ?limit=&offset=
+ * ?scope=task|all  ?status=pending|done  ?q=닉네임·아이디·보상·비고·게시글 주소  ?limit=&offset=
  * ------------------------------------------------------------------ */
 
 async function list(request, env, admin) {
@@ -526,14 +526,21 @@ async function list(request, env, admin) {
   else if (status) { searchItemCond.push(`s.status = ?`); searchItemArgs.push(status); }
   const searchItemWhere = searchItemCond.length ? ` AND ${searchItemCond.join(' AND ')}` : '';
 
+  /* 게시글 주소로도 찾습니다 — 완료 처리 때 적은 done_ref 와 비교합니다.
+     주소를 통째로 붙여 넣어도 되고, /post/숫자 만 있으면 호스트가 달라도(afreecatv/sooplive) 잡힙니다. */
+  const postNo = (q.match(/\/post\/(\d+)/) || [])[1] || '';
+  const refPat = postNo ? `%/post/${postNo}%` : `%${q}%`;
+
   const searchWhere = q
     ? ` AND (o.donor_name LIKE ? OR o.donor_id LIKE ? OR o.msg LIKE ?
              OR EXISTS (SELECT 1 FROM roulette_items s
                          WHERE s.order_idx = o.idx${searchItemWhere}
-                           AND (s.label LIKE ? OR s.memo LIKE ? OR s.resolved_label LIKE ?)))`
+                           AND (s.label LIKE ? OR s.memo LIKE ? OR s.resolved_label LIKE ?
+                                OR s.done_ref LIKE ? OR s.request LIKE ? OR s.reply LIKE ?)))`
     : '';
   const searchArgs = q
-    ? [`%${q}%`, `%${q}%`, `%${q}%`, ...searchItemArgs, `%${q}%`, `%${q}%`, `%${q}%`]
+    ? [`%${q}%`, `%${q}%`, `%${q}%`, ...searchItemArgs,
+       `%${q}%`, `%${q}%`, `%${q}%`, refPat, `%${q}%`, `%${q}%`]
     : [];
 
   const ordersQ = await env.DB.prepare(
