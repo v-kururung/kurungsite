@@ -33,6 +33,7 @@
     status: 'pending', q: '', offset: 0,
     orders: [], hasMore: false, menu: [], menuOpen: false,
     pick: null,     /* 지금 고른 항목 (order_idx::seq) */
+    pickHost: null, /* 쿠폰 태그를 누른 카드 — 처리 바를 그 카드 아래에 붙입니다 */
     manual: [],     /* 수동 등록에 담은 룰렛 결과 */
     image: '',      /* 첨부한 이미지 주소 */
   };
@@ -637,13 +638,33 @@
       return;
     }
 
+    /* 보유 중인 쿠폰은 목록 줄로 보여주지 않고, 그 후원자의 남은 숙제 카드에 태그로 모아 보여줍니다 */
+    var wallet = couponWallet();
+
     wrap.innerHTML = state.orders.map(function (o) {
+      var rows = o.items.filter(function (it) { return !isHeldCoupon(it); });
+      var hasOpen = rows.some(function (it) { return it.status === 'pending' || it.status === 'scheduled'; });
+      var coupons = hasOpen ? (wallet[o.donor_id] || []) : [];
+
+      /* 보여줄 줄이 하나도 없는 카드(쿠폰만 있는 건) — 대기 탭에서는 감추고, 그 외에는 한 줄로만 */
+      if (rows.length === 0) {
+        if (state.status === 'pending') return '';
+        var held = o.items.filter(isHeldCoupon).length;
+        return '<div class="rl-order rl-order-thin" data-order="' + esc(o.idx) + '">' +
+          '<div class="rl-head">' +
+          '<b>' + esc(o.donor_name) + '</b><span class="rl-id">' + esc(o.donor_id) + '</span>' +
+          '<span class="rl-amt">' + o.amount + '개</span>' +
+          '<span class="rl-time">' + when(o.donated_at) + '</span>' +
+          '<span class="rl-thin-note">🎟 보유 쿠폰 ' + held + '장 — 다른 숙제가 생기면 그 카드에 태그로 떠요</span>' +
+          '</div></div>';
+      }
+
       var prog = o.task_total
         ? '<span class="rl-prog' + (o.task_done === o.task_total ? ' full' : '') + '">완료 ' +
           o.task_done + '/' + o.task_total + '</span>'
         : '';
 
-      var items = o.items.map(function (it) {
+      var items = rows.map(function (it) {
         var k = key(o.idx, it.seq);
         var extra = [];
         if (it.resolved_label) extra.push('→ <b>' + esc(it.resolved_label) + '</b>');
@@ -654,22 +675,9 @@
         }
         if (it.memo) extra.push(esc(it.memo));
 
-        /* 시청자가 남긴 요청 */
-        var req = '';
-        if (it.request || it.request_image || it.request_email) {
-          req = '<div class="rl-req"><b>요청</b> ' + esc(it.request || '') +
-            (it.request_email
-              ? '<span class="rl-mail">✉ ' + esc(it.request_email) + '</span>' : '') +
-            (it.request_image
-              ? '<a class="rl-shot" href="' + esc(it.request_image) + '" target="_blank">' +
-                '<img src="' + esc(it.request_image) + '" alt=""></a>' : '') +
-            '</div>';
-        } else if (needsInput(it.label)) {
-          req = '<div class="rl-req wait">요청 기다리는 중</div>';
-        }
-        if (it.reply) {
-          req += '<div class="rl-req reply"><b>답변</b> ' + esc(it.reply) + '</div>';
-        }
+        /* 시청자가 남긴 요청 — 줄 안의 작은 배지로. 요청 전엔 회색, 요청이 오면 파란색.
+           마우스를 올리면 내용(글·메일·사진·답변)이 풍선으로 보입니다 */
+        var req = reqBadge(it);
 
         var right =
           (it.image_url ? '<a class="rl-shot" href="' + esc(it.image_url) + '" target="_blank">' +
@@ -685,9 +693,10 @@
           (String(it.label_key || '').indexOf('bonus:') === 0
             ? '<span class="rl-bonus">보너스</span>'
             : '<span class="rl-pct">' + it.percent + '%</span>') +
+          req +
           (extra.length ? '<span class="rl-extra">' + extra.join(' · ') + '</span>' : '') +
           '<span class="rl-right">' + right + '</span>' +
-          '</label>' + req;
+          '</label>';
       }).join('');
 
       return '<div class="rl-order" data-order="' + esc(o.idx) + '">' +
@@ -721,19 +730,37 @@
         prog +
         '</div>' +
         (String(o.idx).charAt(0) === 'M' ? editForm(o) : '') +
-        items + '</div>';
+        items +
+        couponTags(coupons, o.idx) +
+        '</div>';
     }).join('');
+
+    /* 쿠폰 태그 — 누르면 그 쿠폰이 골라지고, 처리 바에 '어느 숙제에 쓸까요?'가 뜹니다 */
+    wrap.querySelectorAll('button[data-cp]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (state.pick === b.dataset.cp) {
+          state.pick = null; state.pickHost = null;
+          resetInputs();
+          renderList();
+        } else {
+          state.pick = b.dataset.cp;
+          state.pickHost = b.dataset.host;
+          resetInputs();
+          renderList();
+        }
+      });
+    });
 
     /* 같은 항목을 다시 누르면 선택이 풀립니다 */
     wrap.querySelectorAll('input[type=radio]').forEach(function (r) {
       r.addEventListener('click', function () {
         if (state.pick === r.dataset.k) {
-          state.pick = null;
+          state.pick = null; state.pickHost = null;
           r.checked = false;
           resetInputs();
           renderList();
         } else {
-          state.pick = r.dataset.k;
+          state.pick = r.dataset.k; state.pickHost = null;
           renderList();
           loadPick();          /* 고른 항목의 기존 값을 불러옵니다 */
         }
@@ -792,6 +819,87 @@
 
     document.getElementById('rlMore').style.display = state.hasMore ? '' : 'none';
     placeDock();
+  }
+
+  /* ───── 쿠폰 지갑 ─────
+     '단독 사용 불가' 교환권은 숙제 줄이 아니라 태그로 다룹니다.
+     후원자별로 아직 안 쓴 쿠폰을 모아두고, 그 사람의 남은 숙제 카드에 붙여 보여줍니다. */
+
+  function isHeldCoupon(it) {
+    return it.kind === 'coupon' && it.status !== 'used' && it.status !== 'void' && it.status !== 'done';
+  }
+
+  /* donor_id → [{ key, label, order, item }] (받은 순서대로) */
+  function couponWallet() {
+    var w = {};
+    state.orders.forEach(function (o) {
+      if (!o.donor_id) return;
+      o.items.forEach(function (it) {
+        if (!isHeldCoupon(it)) return;
+        (w[o.donor_id] = w[o.donor_id] || []).push({
+          key: key(o.idx, it.seq), label: it.label, order: o, item: it,
+        });
+      });
+    });
+    Object.keys(w).forEach(function (d) {
+      w[d].sort(function (a, b) {
+        return String(a.order.donated_at).localeCompare(String(b.order.donated_at)) || (a.item.seq - b.item.seq);
+      });
+    });
+    return w;
+  }
+
+  /* 같은 이름끼리 묶어 '이름 ×N' 태그로. 누르면 그 묶음에서 가장 오래된 쿠폰이 골라집니다 */
+  function couponTags(list, hostIdx) {
+    if (!list || list.length === 0) return '';
+    var groups = [], byLabel = {};
+    list.forEach(function (c) {
+      var g = byLabel[c.label];
+      if (!g) { g = byLabel[c.label] = { label: c.label, keys: [], from: [] }; groups.push(g); }
+      g.keys.push(c.key);
+      g.from.push(shortWhen(c.order.donated_at));
+    });
+    return '<div class="rl-cpbox">' +
+      '<span class="rl-cpbox-lbl">🎟 쿠폰</span>' +
+      groups.map(function (g) {
+        var sel = g.keys.indexOf(state.pick) >= 0;
+        var k = sel ? state.pick : g.keys[0];
+        return '<button type="button" class="rl-cptag' + (sel ? ' sel' : '') + '"' +
+          ' data-cp="' + esc(k) + '" data-host="' + esc(hostIdx) + '"' +
+          ' title="받은 날: ' + esc(g.from.join(', ')) + '">' +
+          esc(g.label) + (g.keys.length > 1 ? '<i>×' + g.keys.length + '</i>' : '') +
+          '</button>';
+      }).join('') +
+      '<span class="rl-cpbox-hint">눌러서 이 숙제 중 하나에 사용</span>' +
+      '</div>';
+  }
+
+  /* 요청 배지 + 풍선 */
+  function reqBadge(it) {
+    var has = !!(it.request || it.request_image || it.request_email);
+    if (!has && !needsInput(it.label)) return '';
+
+    var pop = '';
+    if (has) {
+      pop += '<div class="rl-pop-sec"><b>요청</b>' +
+        (it.request ? '<div class="rl-pop-txt">' + esc(it.request) + '</div>' : '') +
+        (it.request_email ? '<div class="rl-pop-mail">✉ ' + esc(it.request_email) + '</div>' : '') +
+        (it.request_image
+          ? '<a class="rl-pop-img" href="' + esc(it.request_image) + '" target="_blank" rel="noopener">' +
+            '<img src="' + esc(it.request_image) + '" alt=""></a>' : '') +
+        '</div>';
+    } else {
+      pop += '<div class="rl-pop-sec wait">아직 요청이 없어요 — 시청자가 코드로 요청을 남기면 여기 보여요</div>';
+    }
+    if (it.reply) {
+      pop += '<div class="rl-pop-sec reply"><b>답변</b><div class="rl-pop-txt">' + esc(it.reply) + '</div></div>';
+    }
+
+    var cls = has ? 'has' : 'wait';
+    var txt = has ? '요청' : '요청 대기';
+    return '<span class="rl-reqtag ' + cls + (it.reply ? ' replied' : '') + '" tabindex="0">' +
+      txt + (it.request_image ? ' 📷' : '') + (it.reply ? ' · 답변' : '') +
+      '<span class="rl-pop">' + pop + '</span></span>';
   }
 
   /* 이 항목이 요청 받기 대상인지 */
@@ -944,7 +1052,9 @@
       return;
     }
 
-    var target = document.querySelector('.rl-order[data-order="' + p.order.idx + '"]');
+    var hostIdx = state.pickHost || p.order.idx;
+    var target = document.querySelector('.rl-order[data-order="' + hostIdx + '"]') ||
+                 document.querySelector('.rl-order[data-order="' + p.order.idx + '"]');
     if (!target) return;
 
     dock.querySelector('#rlPicked').textContent = p.item.label;
@@ -973,10 +1083,13 @@
     dock.querySelector('.rl-coupon-lbl').textContent = used ? '이미 사용한 쿠폰입니다' : '어느 숙제에 쓸까요?';
     if (used) return;
 
-    /* 같은 후원자의 대기 숙제만 후보로 */
+    /* 같은 후원자의 대기 숙제만 후보로 — 태그를 누른 카드의 숙제가 먼저 오게 */
     var donor = p.order.donor_id;
     var opts = [];
-    state.orders.forEach(function (o) {
+    var ordered = state.orders.slice().sort(function (a, b) {
+      return (b.idx === state.pickHost) - (a.idx === state.pickHost);
+    });
+    ordered.forEach(function (o) {
       if (o.donor_id !== donor) return;
       o.items.forEach(function (it) {
         if (it.kind === 'coupon' || it.status !== 'pending') return;
@@ -1010,7 +1123,7 @@
         },
       });
       say('🎟 ' + r.new_label + ' 로 승급했어요');
-      state.pick = null;
+      state.pick = null; state.pickHost = null;
       await refresh();
     } catch (e) { say('사용 처리 실패: ' + e.message); }
   }
@@ -1022,7 +1135,7 @@
     try {
       await api('/coupon/undo', { method: 'POST', body: { order_idx: p.order.idx, seq: p.item.seq } });
       say('쿠폰을 되돌렸어요');
-      state.pick = null;
+      state.pick = null; state.pickHost = null;
       await refresh();
     } catch (e) { say('취소 실패: ' + e.message); }
   }
@@ -1047,7 +1160,7 @@
   }
 
   function clearPick() {
-    state.pick = null;
+    state.pick = null; state.pickHost = null;
     resetInputs();
     renderList();
   }
@@ -1062,7 +1175,7 @@
   /* ───── 동작 ───── */
 
   async function refresh(keepOffset) {
-    if (!keepOffset) { state.offset = 0; state.orders = []; state.pick = null; state.image = ''; }
+    if (!keepOffset) { state.offset = 0; state.orders = []; state.pick = null; state.pickHost = null; state.image = ''; }
     var qs = '?scope=task&order=asc&limit=' + PAGE + '&offset=' + state.offset +
       (state.status ? '&status=' + state.status : '') +
       (state.q ? '&q=' + encodeURIComponent(state.q) : '');
@@ -1240,6 +1353,21 @@
     '.rl-st.rl-held{background:#f3edff;color:#6b3fd1}',
     '.rl-st.rl-used{background:#f2f4f6;color:#8b95a1}',
     '.rl-cp{color:#6b3fd1;font-weight:600}',
+    /* 쿠폰 태그 영역 — 카드 맨 아래 */
+    '.rl-cpbox{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:6px 0 2px 9px;',
+    'padding:7px 10px;border-radius:9px;background:#f8f5ff;border:1px dashed #d9ccf5}',
+    '.rl-cpbox-lbl{font-size:12px;font-weight:700;color:#6b3fd1;white-space:nowrap}',
+    '.rl-cptag{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;',
+    'border:1px solid #d9ccf5;background:#fff;color:#5a3bb5;font:inherit;font-size:12px;font-weight:600;',
+    'cursor:pointer;transition:background .12s,border-color .12s,transform .12s}',
+    '.rl-cptag i{font-style:normal;font-weight:700;color:#8b6fd6;font-size:11px}',
+    '.rl-cptag:hover{background:#f3edff;border-color:#b79cf0;transform:translateY(-1px)}',
+    '.rl-cptag.sel{background:#6b3fd1;border-color:#6b3fd1;color:#fff}',
+    '.rl-cptag.sel i{color:#e6dcff}',
+    '.rl-cpbox-hint{font-size:11px;color:#a08fd0;margin-left:auto;white-space:nowrap}',
+    '.rl-order-thin{padding:9px 14px;opacity:.75}',
+    '.rl-order-thin .rl-head{margin-bottom:0}',
+    '.rl-thin-note{font-size:12px;color:#8b6fd6}',
     '.rl-coupon-lbl{font-size:13px;color:#6b3fd1;font-weight:600;white-space:nowrap}',
     '.rl-dock #rlCouponTarget{flex:2;min-width:200px;padding:8px 11px;border:1px solid #d1d6db;',
     'border-radius:8px;font:inherit;font-size:13px;background:#fff}',
@@ -1297,6 +1425,30 @@
     '.rl-ask.on{color:#1b64da;font-weight:600}',
     '.rl-askmsg{flex:1 1 200px;min-width:0;padding:5px 10px;border:1px solid #e5e8eb;',
     'border-radius:7px;font:inherit;font-size:12px;color:#333d4b}',
+    /* 요청 배지 — 회색(대기) / 파란색(요청 있음). 올리면 풍선 */
+    '.rl-reqtag{position:relative;display:inline-flex;align-items:center;gap:3px;',
+    'font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;cursor:default;',
+    'background:#f2f4f6;color:#b0b8c1;border:1px solid transparent;transition:background .12s,color .12s}',
+    '.rl-reqtag.has{background:#e8f3ff;color:#1b64da;border-color:#c9deff}',
+    '.rl-reqtag.has.replied{background:#e8f7ee;color:#0f8b4c;border-color:#bfe7cf}',
+    '.rl-reqtag:hover,.rl-reqtag:focus{outline:0}',
+    '.rl-reqtag.has:hover{background:#d9ebff}',
+    '.rl-pop{display:none;position:absolute;left:0;top:calc(100% + 6px);z-index:50;',
+    'width:max-content;max-width:360px;min-width:200px;padding:10px 12px;border-radius:10px;',
+    'background:#fff;border:1px solid #e5e8eb;box-shadow:0 10px 28px rgba(0,0,0,.14);',
+    'font-size:13px;font-weight:400;color:#333d4b;white-space:normal;text-align:left;cursor:auto}',
+    '.rl-pop::before{content:"";position:absolute;left:14px;top:-6px;width:10px;height:10px;',
+    'background:#fff;border-left:1px solid #e5e8eb;border-top:1px solid #e5e8eb;transform:rotate(45deg)}',
+    '.rl-reqtag:hover .rl-pop,.rl-reqtag:focus .rl-pop,.rl-reqtag:focus-within .rl-pop{display:block}',
+    '.rl-pop-sec{line-height:1.5}',
+    '.rl-pop-sec+.rl-pop-sec{margin-top:8px;padding-top:8px;border-top:1px solid #f2f4f6}',
+    '.rl-pop-sec b{display:block;font-size:11px;color:#1b64da;margin-bottom:2px}',
+    '.rl-pop-sec.reply b{color:#0f8b4c}',
+    '.rl-pop-sec.wait{color:#b0b8c1;font-style:italic;font-size:12px}',
+    '.rl-pop-txt{white-space:pre-wrap;word-break:break-word}',
+    '.rl-pop-mail{margin-top:4px;font-size:12px;color:#6b7684}',
+    '.rl-pop-img{display:block;margin-top:6px}',
+    '.rl-pop-img img{max-width:100%;max-height:220px;border-radius:8px;border:1px solid #e5e8eb;display:block}',
     '.rl-req{margin:-2px 0 6px 31px;padding:7px 11px;border-radius:8px;background:#f8f9fa;',
     'font-size:13px;color:#333d4b;line-height:1.5;white-space:pre-wrap;word-break:break-word}',
     '.rl-req b{color:#1b64da;font-size:12px;margin-right:5px}',
