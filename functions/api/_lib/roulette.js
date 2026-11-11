@@ -527,20 +527,26 @@ async function list(request, env, admin) {
   const searchItemWhere = searchItemCond.length ? ` AND ${searchItemCond.join(' AND ')}` : '';
 
   /* 게시글 주소로도 찾습니다 — 완료 처리 때 적은 done_ref 와 비교합니다.
-     주소를 통째로 붙여 넣어도 되고, /post/숫자 만 있으면 호스트가 달라도(afreecatv/sooplive) 잡힙니다. */
+     주소를 통째로 붙여 넣어도 되고, /post/숫자 만 있으면 호스트가 달라도(afreecatv/sooplive) 잡힙니다.
+
+     LIKE 대신 instr()을 씁니다. D1(SQLite)은 LIKE 패턴이 조금만 길어도
+     "LIKE or GLOB pattern too complex"로 막혀서 주소처럼 긴 검색어가 안 들어가요.
+     대소문자는 lower()로 맞춥니다. */
   const postNo = (q.match(/\/post\/(\d+)/) || [])[1] || '';
-  const refPat = postNo ? `%/post/${postNo}%` : `%${q}%`;
+  const needle = q.toLowerCase();
+  const refNeedle = postNo ? `/post/${postNo}` : needle;
+  const has = (col) => `instr(lower(COALESCE(${col}, '')), ?) > 0`;
 
   const searchWhere = q
-    ? ` AND (o.donor_name LIKE ? OR o.donor_id LIKE ? OR o.msg LIKE ?
+    ? ` AND (${has('o.donor_name')} OR ${has('o.donor_id')} OR ${has('o.msg')}
              OR EXISTS (SELECT 1 FROM roulette_items s
                          WHERE s.order_idx = o.idx${searchItemWhere}
-                           AND (s.label LIKE ? OR s.memo LIKE ? OR s.resolved_label LIKE ?
-                                OR s.done_ref LIKE ? OR s.request LIKE ? OR s.reply LIKE ?)))`
+                           AND (${has('s.label')} OR ${has('s.memo')} OR ${has('s.resolved_label')}
+                                OR ${has('s.done_ref')} OR ${has('s.request')} OR ${has('s.reply')})))`
     : '';
   const searchArgs = q
-    ? [`%${q}%`, `%${q}%`, `%${q}%`, ...searchItemArgs,
-       `%${q}%`, `%${q}%`, `%${q}%`, refPat, `%${q}%`, `%${q}%`]
+    ? [needle, needle, needle, ...searchItemArgs,
+       needle, needle, needle, refNeedle, needle, needle]
     : [];
 
   const ordersQ = await env.DB.prepare(
@@ -608,8 +614,11 @@ async function donors(request, env) {
   /* new = 최근에 후원한 분부터, old = 오래 기다린 분부터(기본) */
   const newest = u.searchParams.get('order') === 'new';
 
-  const where = q ? `AND (o.donor_name LIKE ?1 OR o.donor_id LIKE ?1)` : '';
-  const args = q ? [`%${q}%`] : [];
+  /* LIKE 는 D1에서 긴 검색어에 막히므로(pattern too complex) instr() 로 찾습니다 */
+  const where = q
+    ? `AND (instr(lower(COALESCE(o.donor_name, '')), ?1) > 0 OR instr(lower(COALESCE(o.donor_id, '')), ?1) > 0)`
+    : '';
+  const args = q ? [q.toLowerCase()] : [];
 
   const rows = await env.DB.prepare(
     `SELECT o.donor_id,
