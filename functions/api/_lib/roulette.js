@@ -554,14 +554,22 @@ async function list(request, env, admin) {
   const monthWhere = month ? ` AND substr(o.donated_at, 1, 7) = ?` : '';
   const monthArgs = month ? [month] : [];
 
-  /* 월 목록 — 지금 보고 있는 상태(대기/완료)에 해당하는 주문이 있는 달만.
-     그래서 대기 탭에서는 숙제가 모두 끝난 달이 자연스럽게 사라집니다. */
+  /* 월 목록 — 지금 보고 있는 탭에 실제로 보일 숙제가 있는 달만.
+     대기 탭은 '아직 안 끝난 숙제'(보유 쿠폰만 남은 건 제외)가 있는 달만 세어서,
+     숙제가 모두 끝난 달은 칩에서 사라집니다. */
+  const monthCond = [];
+  const monthCondArgs = [];
+  if (scope === 'task') monthCond.push(`i.kind NOT IN ('instant','meta')`);
+  if (status === 'pending') monthCond.push(`i.kind <> 'coupon' AND i.status IN ('pending','scheduled')`);
+  else if (status === 'done') monthCond.push(`i.status IN ('done','used')`);
+  else if (status) { monthCond.push(`i.status = ?`); monthCondArgs.push(status); }
+  const monthCondWhere = monthCond.length ? ` AND ${monthCond.join(' AND ')}` : '';
   const monthsQ = await env.DB.prepare(
     `SELECT DISTINCT substr(o.donated_at, 1, 7) AS m
        FROM roulette_orders o
-      WHERE EXISTS (SELECT 1 FROM roulette_items i WHERE i.order_idx = o.idx${itemWhere})
+      WHERE EXISTS (SELECT 1 FROM roulette_items i WHERE i.order_idx = o.idx${monthCondWhere})
       ORDER BY m ASC`
-  ).bind(...itemArgs).all();
+  ).bind(...monthCondArgs).all();
   const months = monthsQ.results.map((r) => r.m).filter(Boolean);
 
   const ordersQ = await env.DB.prepare(

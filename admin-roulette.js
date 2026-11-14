@@ -753,6 +753,12 @@
         '</div>';
     }).join('');
 
+    /* 카드가 전부 숨겨졌으면(보유 쿠폰만 남은 건들) 빈 안내를 보여줍니다 */
+    if (!wrap.innerHTML.trim()) {
+      wrap.innerHTML = '<p class="rl-empty">' +
+        (state.status === 'pending' ? '남은 숙제가 없어요 🎉' : '해당하는 내역이 없어요') + '</p>';
+    }
+
     /* 쿠폰 태그 — 누르면 그 쿠폰이 골라지고, 처리 바에 '어느 숙제에 쓸까요?'가 뜹니다 */
     wrap.querySelectorAll('button[data-cp]').forEach(function (b) {
       b.addEventListener('click', function () {
