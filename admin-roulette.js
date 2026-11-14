@@ -852,25 +852,49 @@
     return w;
   }
 
-  /* 같은 이름끼리 묶어 '이름 ×N' 태그로. 누르면 그 묶음에서 가장 오래된 쿠폰이 골라집니다 */
+  /* 같은 이름끼리 묶어 '이름 ×N' 태그로. 누르면 그 묶음에서 가장 오래된 쿠폰이 골라집니다.
+     쿠폰에 시청자가 요청을 적어뒀으면 태그가 파란 테두리로 바뀌고, 올리면 내용이 풍선으로 보입니다 */
   function couponTags(list, hostIdx) {
     if (!list || list.length === 0) return '';
     var groups = [], byLabel = {};
     list.forEach(function (c) {
       var g = byLabel[c.label];
-      if (!g) { g = byLabel[c.label] = { label: c.label, keys: [], from: [] }; groups.push(g); }
+      if (!g) { g = byLabel[c.label] = { label: c.label, keys: [], from: [], notes: [] }; groups.push(g); }
       g.keys.push(c.key);
       g.from.push(shortWhen(c.order.donated_at));
+      var it = c.item;
+      if (it.request || it.request_image || it.request_email || it.reply) {
+        g.notes.push({ when: shortWhen(c.order.donated_at), it: it });
+      }
     });
     return '<div class="rl-cpbox">' +
       '<span class="rl-cpbox-lbl">🎟 쿠폰</span>' +
       groups.map(function (g) {
         var sel = g.keys.indexOf(state.pick) >= 0;
         var k = sel ? state.pick : g.keys[0];
-        return '<button type="button" class="rl-cptag' + (sel ? ' sel' : '') + '"' +
+        var hasNote = g.notes.length > 0;
+        var pop = '';
+        if (hasNote) {
+          pop = '<span class="rl-pop">' + g.notes.map(function (n) {
+            var it = n.it;
+            return '<div class="rl-pop-sec"><b>' + esc(n.when) + ' 쿠폰에 적힌 요청</b>' +
+              (it.request ? '<div class="rl-pop-txt">' + esc(it.request) + '</div>' : '') +
+              (it.request_email ? '<div class="rl-pop-mail">✉ ' + esc(it.request_email) + '</div>' : '') +
+              (it.request_image
+                ? '<a class="rl-pop-img" href="' + esc(it.request_image) + '" target="_blank" rel="noopener">' +
+                  '<img src="' + esc(it.request_image) + '" alt=""></a>' : '') +
+              '</div>' +
+              (it.reply
+                ? '<div class="rl-pop-sec reply"><b>답변</b><div class="rl-pop-txt">' + esc(it.reply) + '</div></div>'
+                : '');
+          }).join('') + '</span>';
+        }
+        return '<button type="button" class="rl-cptag' + (sel ? ' sel' : '') + (hasNote ? ' req' : '') + '"' +
           ' data-cp="' + esc(k) + '" data-host="' + esc(hostIdx) + '"' +
-          ' title="받은 날: ' + esc(g.from.join(', ')) + '">' +
+          (hasNote ? '' : ' title="받은 날: ' + esc(g.from.join(', ')) + '"') + '>' +
           esc(g.label) + (g.keys.length > 1 ? '<i>×' + g.keys.length + '</i>' : '') +
+          (hasNote ? '<em>💬</em>' : '') +
+          pop +
           '</button>';
       }).join('') +
       '<span class="rl-cpbox-hint">눌러서 이 숙제 중 하나에 사용</span>' +
@@ -1360,13 +1384,20 @@
     '.rl-cpbox{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:6px 0 2px 9px;',
     'padding:7px 10px;border-radius:9px;background:#f8f5ff;border:1px dashed #d9ccf5}',
     '.rl-cpbox-lbl{font-size:12px;font-weight:700;color:#6b3fd1;white-space:nowrap}',
-    '.rl-cptag{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;',
+    '.rl-cptag{position:relative;display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;',
     'border:1px solid #d9ccf5;background:#fff;color:#5a3bb5;font:inherit;font-size:12px;font-weight:600;',
     'cursor:pointer;transition:background .12s,border-color .12s,transform .12s}',
     '.rl-cptag i{font-style:normal;font-weight:700;color:#8b6fd6;font-size:11px}',
     '.rl-cptag:hover{background:#f3edff;border-color:#b79cf0;transform:translateY(-1px)}',
     '.rl-cptag.sel{background:#6b3fd1;border-color:#6b3fd1;color:#fff}',
     '.rl-cptag.sel i{color:#e6dcff}',
+    /* 요청이 적힌 쿠폰 — 파란 테두리 + 말풍선 표시, 올리면 내용 */
+    '.rl-cptag.req{border-color:#1b64da;background:#eef5ff;color:#1b64da}',
+    '.rl-cptag.req:hover{background:#dcebff;border-color:#1b64da}',
+    '.rl-cptag.req.sel{background:#1b64da;border-color:#1b64da;color:#fff}',
+    '.rl-cptag em{font-style:normal;font-size:11px;line-height:1}',
+    '.rl-cptag .rl-pop{font-weight:400;color:#333d4b;cursor:auto}',
+    '.rl-cptag:hover .rl-pop,.rl-cptag:focus .rl-pop{display:block}',
     '.rl-cpbox-hint{font-size:11px;color:#a08fd0;margin-left:auto;white-space:nowrap}',
     '.rl-order-thin{padding:9px 14px;opacity:.75}',
     '.rl-order-thin .rl-head{margin-bottom:0}',

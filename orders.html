@@ -74,6 +74,8 @@
 .oneed{display:inline-block;margin-left:8px;font-family:var(--body);font-size:14px;font-weight:500;
   color:var(--sub);background:var(--page);border:1px solid var(--line);
   padding:0 7px;border-radius:5px;line-height:1.6;vertical-align:middle}
+/* 이미 요청을 적어둔 항목은 '입력 완료' — 코드 입력 전에도, 저장 직후에도 */
+.oneed.ok{color:#2f8f5b;background:#eaf7ee;border-color:#bfe3cb}
 
 /* 보유 쿠폰 — 숙제 축과 분리된 한 줄 */
 .ocoupon{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;
@@ -236,7 +238,10 @@ function line(it, isDone){
     : esc(it.label);
   var memo = it.memo ? '<span class="memo">'+esc(it.memo)+'</span>' : '';
   var at   = (isDone && it.done_at) ? '<span class="at">'+niceDate(it.done_at)+' 완료</span>' : '';
-  var need = (!isDone && it.needs_input) ? '<span class="oneed">요청 필요</span>' : '';
+  /* 요청을 적어야 하는 항목 — 이미 적어뒀으면(서버가 참/거짓만 알려줌) '입력 완료' */
+  var need = (!isDone && it.needs_input)
+    ? (it.has_request ? '<span class="oneed ok">입력 완료</span>' : '<span class="oneed">요청 필요</span>')
+    : '';
   var up   = it.coupon_used ? '<span class="oup">🎟 교환권 승급</span>' : '';
 
   return '<div class="oitem" data-key="'+esc(keyOf(it))+'">'
@@ -347,6 +352,17 @@ function dropInner(url){
     : '<span class="txt">이미지를 붙여넣거나 끌어다 놓으세요 · 눌러서 고를 수도 있어요</span>';
 }
 
+/* '요청 필요' 배지를 상태에 맞게 바꿉니다 — 적어둔 게 있으면 '입력 완료' */
+function markNeed(row, written){
+  if(!row) return;
+  var b = row.querySelector('.oneed'); if(!b) return;
+  b.textContent = written ? '입력 완료' : '요청 필요';
+  b.classList.toggle('ok', !!written);
+}
+function hasWritten(m){
+  return !!((m.request && String(m.request).trim()) || m.request_image || m.request_email);
+}
+
 /* 코드가 맞으면 대기 항목 아래에 작성칸을 끼워 넣습니다 */
 function openForms(cardEl, donor, data, code){
   var mineBy = {};
@@ -357,7 +373,10 @@ function openForms(cardEl, donor, data, code){
     var mine = mineBy[keyOf(it)];
     if(!mine) return;
     var row = cardEl.querySelector('.oitem[data-key="'+keyOf(it)+'"]');
-    if(!row || row.nextElementSibling && row.nextElementSibling.classList.contains('oform')) return;
+    if(!row) return;
+    /* 이미 적어둔 요청이 있으면 배지를 '입력 완료'로 */
+    markNeed(row, hasWritten(mine));
+    if(row.nextElementSibling && row.nextElementSibling.classList.contains('oform')) return;
     row.insertAdjacentHTML('afterend', formHtml(it, mine));
     any = true;
   });
@@ -462,6 +481,15 @@ async function saveReq(box, code, btn){
     msg.textContent = '저장했어요 🌿';
     msg.classList.add('ok');
     box.classList.toggle('saved', !!ta.value.trim());
+    /* 저장 결과를 배지에도 바로 반영 */
+    var row = box.previousElementSibling;
+    if(row && row.classList.contains('oitem')){
+      markNeed(row, hasWritten({
+        request: ta.value,
+        request_email: box.querySelector('.omail input').value.trim(),
+        request_image: box.querySelector('.odrop').dataset.img || ''
+      }));
+    }
   }catch(e){
     msg.textContent = '저장하지 못했어요';
   }

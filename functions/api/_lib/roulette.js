@@ -644,12 +644,17 @@ async function donors(request, env) {
 
   /* 대기·완료 항목을 함께 받아 각 후원자에 붙입니다.
      done_ref(게시글 주소)·image_url(작업 스크린샷)·request(본인만 보는 요청)는
-     공개 화면에 나가면 안 되므로 아예 조회하지 않습니다. */
+     공개 화면에 나가면 안 되므로 아예 조회하지 않습니다.
+     다만 "요청을 적어뒀는지" 여부(참/거짓)만은 내려줘서 코드 입력 전에도 '입력 완료'를 보여줍니다. */
   const ids = list.map((d) => d.donor_id);
   const items = await env.DB.prepare(
     `SELECT o.donor_id, o.donated_at, i.order_idx, i.seq, i.status, i.label,
             i.memo, i.resolved_label, i.done_at,
-            COALESCE(mn.needs_input, 0) AS needs_input
+            COALESCE(mn.needs_input, 0) AS needs_input,
+            CASE WHEN (i.request IS NOT NULL AND TRIM(i.request) <> '')
+                   OR (i.request_image IS NOT NULL AND i.request_image <> '')
+                   OR (i.request_email IS NOT NULL AND i.request_email <> '')
+                 THEN 1 ELSE 0 END AS has_request
        FROM roulette_items i
        JOIN roulette_orders o ON o.idx = i.order_idx
        LEFT JOIN roulette_menu mn ON mn.label_key = i.label_key
@@ -689,6 +694,8 @@ async function donors(request, env) {
       resolved_label: it.resolved_label,
       /* 요청을 적어야 하는 항목인지. 내용 자체는 코드가 있어야 볼 수 있습니다 */
       needs_input: it.needs_input ? 1 : 0,
+      /* 요청을 이미 적어뒀는지 (내용은 안 나감) */
+      has_request: it.has_request ? 1 : 0,
       /* 교환권을 얹어 승급된 숙제 */
       coupon_used: usedOn.has(it.order_idx + '::' + it.seq) ? 1 : 0,
     };
