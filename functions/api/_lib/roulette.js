@@ -487,7 +487,7 @@ async function maybeSyncSets(env) {
 
 /* ------------------------------------------------------------------ *
  * GET /api/roulette/list — 방문자용 주문내역
- * ?scope=task|all  ?status=pending|done  ?q=닉네임·아이디·보상·비고·게시글 주소  ?limit=&offset=
+ * ?scope=task|all  ?status=pending|done  ?q=닉네임·아이디·보상·비고·게시글 주소  ?month=YYYY-MM  ?limit=&offset=
  * ------------------------------------------------------------------ */
 
 async function list(request, env, admin) {
@@ -495,6 +495,8 @@ async function list(request, env, admin) {
   const scope = u.searchParams.get('scope') === 'all' ? 'all' : 'task';
   const status = u.searchParams.get('status') || '';
   const q = (u.searchParams.get('q') || '').trim();
+  /* 월 필터 — 'YYYY-MM' (후원 시각 기준) */
+  const month = /^\d{4}-\d{2}$/.test(u.searchParams.get('month') || '') ? u.searchParams.get('month') : '';
   const limit = Math.min(Number(u.searchParams.get('limit')) || 10, 200);
   const offset = Math.max(Number(u.searchParams.get('offset')) || 0, 0);
   /* 관리자는 오래된 순(먼저 받은 숙제부터), 방문자 화면은 최신순이 자연스럽습니다 */
@@ -549,6 +551,19 @@ async function list(request, env, admin) {
        needle, needle, needle, refNeedle, needle, needle]
     : [];
 
+  const monthWhere = month ? ` AND substr(o.donated_at, 1, 7) = ?` : '';
+  const monthArgs = month ? [month] : [];
+
+  /* 월 목록 — 지금 보고 있는 상태(대기/완료)에 해당하는 주문이 있는 달만.
+     그래서 대기 탭에서는 숙제가 모두 끝난 달이 자연스럽게 사라집니다. */
+  const monthsQ = await env.DB.prepare(
+    `SELECT DISTINCT substr(o.donated_at, 1, 7) AS m
+       FROM roulette_orders o
+      WHERE EXISTS (SELECT 1 FROM roulette_items i WHERE i.order_idx = o.idx${itemWhere})
+      ORDER BY m DESC`
+  ).bind(...itemArgs).all();
+  const months = monthsQ.results.map((r) => r.m).filter(Boolean);
+
   const ordersQ = await env.DB.prepare(
     `SELECT o.*,
        (SELECT COUNT(*) FROM roulette_items t
@@ -558,15 +573,35 @@ async function list(request, env, admin) {
        (SELECT c.code FROM roulette_codes c WHERE c.donor_id = o.donor_id) AS code
        FROM roulette_orders o
       WHERE EXISTS (SELECT 1 FROM roulette_items i WHERE i.order_idx = o.idx${itemWhere})
-      ${searchWhere}
+      ${searchWhere}${monthWhere}
       ORDER BY o.donated_at ${dir}
       LIMIT ? OFFSET ?`
-  ).bind(...itemArgs, ...searchArgs, limit, offset).all();
+  ).bind(...itemArgs, ...searchArgs, ...monthArgs, limit, offset).all();
 
   const rows = ordersQ.results;
-  if (rows.length === 0) return json({ orders: [], hasMore: false });
+  if (rows.length === 0) return json({ orders: [], hasMore: false, months, wallet: [] });
 
   const ids = rows.map((r) => r.idx);
+
+  /* 쿠폰 지갑 — 이 페이지에 나온 후원자들이 보유 중인 쿠폰 전부.
+     월 필터·페이지와 상관없이 가져와서, 다른 달에 받은 쿠폰도 태그로 보이게 합니다. (관리자만) */
+  let wallet = [];
+  if (admin) {
+    const donorIds = [...new Set(rows.map((r) => r.donor_id).filter(Boolean))];
+    if (donorIds.length) {
+      const w = await env.DB.prepare(
+        `SELECT o.idx AS order_idx, o.donor_id, o.donated_at,
+                i.seq, i.label, i.kind, i.status, i.request, i.request_at,
+                i.request_image, i.request_email, i.reply, i.reply_at
+           FROM roulette_items i
+           JOIN roulette_orders o ON o.idx = i.order_idx
+          WHERE i.kind = 'coupon' AND i.status = 'held'
+            AND o.donor_id IN (${donorIds.map(() => '?').join(',')})
+          ORDER BY o.donated_at ASC, i.seq ASC`
+      ).bind(...donorIds).all();
+      wallet = w.results;
+    }
+  }
   const itemsQ = await env.DB.prepare(
     `SELECT x.order_idx, x.seq, x.label, x.percent, x.kind, x.status, x.done_at, x.done_ref, x.memo,
             x.resolved_label, x.image_url, x.request, x.request_at,
@@ -598,6 +633,8 @@ async function list(request, env, admin) {
       items: grouped.get(o.idx) || [],
     })),
     hasMore: rows.length === limit,
+    months,
+    wallet,
   });
 }
 

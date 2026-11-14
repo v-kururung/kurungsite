@@ -31,6 +31,9 @@
 
   var state = {
     status: 'pending', q: '', offset: 0,
+    month: '',      /* 월 필터 'YYYY-MM' — 비어 있으면 전체 */
+    months: [],     /* 서버가 알려준, 지금 탭에 해당하는 달 목록 */
+    wallet: [],     /* 화면에 나온 후원자들의 보유 쿠폰 (월·페이지 무관) */
     orders: [], hasMore: false, menu: [], menuOpen: false,
     pick: null,     /* 지금 고른 항목 (order_idx::seq) */
     pickHost: null, /* 쿠폰 태그를 누른 카드 — 처리 바를 그 카드 아래에 붙입니다 */
@@ -82,14 +85,25 @@
     return state.orders.filter(function (x) { return x.idx === idx; })[0];
   };
 
+  /* 지갑에서 쿠폰 찾기 — 목록에 없는 달·페이지의 쿠폰을 골랐을 때 */
+  var findWallet = function (k) {
+    var p = String(k || '').split('::');
+    var c = state.wallet.filter(function (w) { return w.order_idx === p[0] && w.seq === Number(p[1]); })[0];
+    if (!c) return null;
+    return {
+      order: { idx: c.order_idx, donor_id: c.donor_id, donated_at: c.donated_at, items: [] },
+      item: c,
+    };
+  };
+
   /* 고른 항목 찾기 */
   function picked() {
     if (!state.pick) return null;
     var p = state.pick.split('::');
     var o = findOrder(p[0]);
-    if (!o) return null;
+    if (!o) return findWallet(state.pick);
     var it = o.items.filter(function (x) { return x.seq === Number(p[1]); })[0];
-    return it ? { order: o, item: it } : null;
+    return it ? { order: o, item: it } : findWallet(state.pick);
   }
 
   /* ───── 화면 뼈대 ───── */
@@ -125,6 +139,7 @@
       '    <input id="rlQ" placeholder="닉네임 · 아이디 · 보상 이름 · 비고 · 게시글 주소" autocomplete="off">',
       '    <button class="btn sub" id="rlSets">확률표 갱신</button>',
       '  </div>',
+      '  <div class="rl-months" id="rlMonths"></div>',
       '  <div id="rlList" class="rl-list"></div>',
       '  <div class="actions"><button class="btn sub" id="rlMore" style="display:none">더 보기 (' + PAGE + '건씩)</button></div>',
       '</div>',
@@ -835,15 +850,26 @@
   /* donor_id → [{ key, label, order, item }] (받은 순서대로) */
   function couponWallet() {
     var w = {};
-    state.orders.forEach(function (o) {
-      if (!o.donor_id) return;
-      o.items.forEach(function (it) {
-        if (!isHeldCoupon(it)) return;
-        (w[o.donor_id] = w[o.donor_id] || []).push({
-          key: key(o.idx, it.seq), label: it.label, order: o, item: it,
+    /* 서버가 내려준 지갑(월·페이지 무관) 우선, 없으면 목록에서 긁어모읍니다 */
+    if (state.wallet.length) {
+      state.wallet.forEach(function (c) {
+        if (!c.donor_id || !isHeldCoupon(c)) return;
+        (w[c.donor_id] = w[c.donor_id] || []).push({
+          key: key(c.order_idx, c.seq), label: c.label,
+          order: { idx: c.order_idx, donor_id: c.donor_id, donated_at: c.donated_at }, item: c,
         });
       });
-    });
+    } else {
+      state.orders.forEach(function (o) {
+        if (!o.donor_id) return;
+        o.items.forEach(function (it) {
+          if (!isHeldCoupon(it)) return;
+          (w[o.donor_id] = w[o.donor_id] || []).push({
+            key: key(o.idx, it.seq), label: it.label, order: o, item: it,
+          });
+        });
+      });
+    }
     Object.keys(w).forEach(function (d) {
       w[d].sort(function (a, b) {
         return String(a.order.donated_at).localeCompare(String(b.order.donated_at)) || (a.item.seq - b.item.seq);
@@ -1201,10 +1227,27 @@
 
   /* ───── 동작 ───── */
 
+  /* 월 칩 — '전체'가 기본. 서버가 준 달만 보이므로 숙제가 다 끝난 달은 대기 탭에서 사라집니다 */
+  function monthLabel(m) {
+    var y = m.slice(0, 4), mo = String(Number(m.slice(5, 7)));
+    return (y === String(new Date().getFullYear()) ? '' : y + '년 ') + mo + '월';
+  }
+  function renderMonths() {
+    var box = document.getElementById('rlMonths');
+    if (!box) return;
+    if (!state.months.length) { box.innerHTML = ''; return; }
+    box.innerHTML = '<button type="button" data-m="" class="' + (state.month ? '' : 'on') + '">전체</button>' +
+      state.months.map(function (m) {
+        return '<button type="button" data-m="' + esc(m) + '" class="' + (state.month === m ? 'on' : '') + '">' +
+          esc(monthLabel(m)) + '</button>';
+      }).join('');
+  }
+
   async function refresh(keepOffset) {
     if (!keepOffset) { state.offset = 0; state.orders = []; state.pick = null; state.pickHost = null; state.image = ''; }
     var qs = '?scope=task&order=asc&limit=' + PAGE + '&offset=' + state.offset +
       (state.status ? '&status=' + state.status : '') +
+      (state.month ? '&month=' + state.month : '') +
       (state.q ? '&q=' + encodeURIComponent(state.q) : '');
 
     try {
@@ -1213,6 +1256,23 @@
       state.menu = res[1].menu || [];
       renderUnknown();
       if (state.menuOpen) renderMenu();
+
+      state.months = res[2].months || [];
+      /* 고른 달이 (다 끝나서) 목록에서 사라졌으면 전체로 돌아갑니다 */
+      if (state.month && state.months.indexOf(state.month) < 0) {
+        state.month = '';
+        renderMonths();
+        return refresh();
+      }
+      renderMonths();
+
+      var wal = res[2].wallet || [];
+      if (state.offset === 0) state.wallet = wal;
+      else {
+        var seen = {};
+        state.wallet.forEach(function (c) { seen[key(c.order_idx, c.seq)] = 1; });
+        wal.forEach(function (c) { if (!seen[key(c.order_idx, c.seq)]) state.wallet.push(c); });
+      }
 
       state.orders = state.offset === 0 ? res[2].orders : state.orders.concat(res[2].orders);
       state.hasMore = res[2].hasMore;
@@ -1293,6 +1353,14 @@
       refresh();
     });
 
+    document.getElementById('rlMonths').addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-m]');
+      if (!b) return;
+      state.month = b.dataset.m;
+      renderMonths();
+      refresh();
+    });
+
     var qEl = document.getElementById('rlQ');
     var timer;
     qEl.addEventListener('input', function () {
@@ -1354,6 +1422,13 @@
     '.rl-seg{display:flex;border:1px solid #e5e8eb;border-radius:8px;overflow:hidden}',
     '.rl-seg button{padding:8px 14px;border:0;background:#fff;font:inherit;font-size:13px;color:#8b95a1;cursor:pointer}',
     '.rl-seg button.on{background:#3182f6;color:#fff;font-weight:600}',
+    /* 월 칩 */
+    '.rl-months{display:flex;gap:6px;flex-wrap:wrap;margin:-6px 0 14px}',
+    '.rl-months:empty{display:none}',
+    '.rl-months button{padding:5px 12px;border-radius:999px;border:1px solid #e5e8eb;background:#fff;',
+    'font:inherit;font-size:12px;font-weight:600;color:#8b95a1;cursor:pointer}',
+    '.rl-months button:hover{background:#f2f4f6;color:#4e5968}',
+    '.rl-months button.on{background:#e8f3ff;border-color:#c9deff;color:#1b64da}',
     '.rl-order{border:1px solid #e5e8eb;border-radius:12px;padding:12px 14px;margin-bottom:10px}',
     '.rl-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:#6b7684;margin-bottom:8px}',
     '.rl-head b{color:#333d4b;font-size:14px}',
