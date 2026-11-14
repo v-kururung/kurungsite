@@ -560,7 +560,7 @@ async function list(request, env, admin) {
     `SELECT DISTINCT substr(o.donated_at, 1, 7) AS m
        FROM roulette_orders o
       WHERE EXISTS (SELECT 1 FROM roulette_items i WHERE i.order_idx = o.idx${itemWhere})
-      ORDER BY m DESC`
+      ORDER BY m ASC`
   ).bind(...itemArgs).all();
   const months = monthsQ.results.map((r) => r.m).filter(Boolean);
 
